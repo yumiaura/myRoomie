@@ -47,6 +47,18 @@ def test_rent_becomes_overdue_after_due_date():
     assert any(event.kind == "rent" for event in pet.inbox)
 
 
+def test_long_absence_produces_several_events():
+    now = 1_000_000.0
+    pet = make_pet(now=now)
+    pet.wallet.money = 100
+    pet.traits.thriftiness = 10      # shopaholic
+    pet.traits.sociability = 90      # misses you quickly
+    pet.stats.loneliness = 60.0
+    pet.stats.affection = 40.0
+    advance(pet, now + 3600 * 72, rng=random.Random(0))  # three days away
+    assert len(pet.inbox) >= 2
+
+
 def test_neglect_eventually_harms_health():
     now = 1_000_000.0
     pet = make_pet(now=now)

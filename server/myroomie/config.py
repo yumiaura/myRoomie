@@ -11,6 +11,12 @@ from __future__ import annotations
 # roomie live faster (handy for demos and tests).
 TIME_SCALE = 1.0
 
+# Offline catch-up: a long absence is replayed in chunks of this many in-world
+# minutes so several autonomous events can happen instead of just one. Beyond
+# CATCHUP_MAX_CHUNKS the remainder is applied as plain drift (no event spam).
+CATCHUP_CHUNK_MIN = 60.0
+CATCHUP_MAX_CHUNKS = 480
+
 # Baseline per-minute stat drift, before personality modifiers ----------
 HUNGER_DECAY_PER_MIN = 0.7
 HYGIENE_DECAY_PER_MIN = 0.5
