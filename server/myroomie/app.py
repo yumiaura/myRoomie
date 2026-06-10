@@ -57,6 +57,14 @@ def create_app(db_path: str = "myroomie.db") -> FastAPI:
         auth_hits[key] = hits
         return len(hits) <= auth.AUTH_RATE_MAX
 
+    def client_key(request: Request) -> str:
+        # Behind a reverse proxy the real client IP is in X-Forwarded-For
+        # (first hop). Falls back to the direct peer when the header is absent.
+        forwarded = request.headers.get("x-forwarded-for", "")
+        if forwarded:
+            return forwarded.split(",")[0].strip()
+        return request.client.host if request.client else "unknown"
+
     def require_user(authorization: str = Header(default="")) -> str:
         token = authorization[7:] if authorization.startswith("Bearer ") else ""
         record = store.user_for_token(token) if token else None
@@ -113,7 +121,7 @@ def create_app(db_path: str = "myroomie.db") -> FastAPI:
     # --- Accounts ----------------------------------------------------
     @app.post("/auth/register")
     def register(req: RegisterRequest, request: Request) -> dict:
-        if not rate_limit_ok(request.client.host):
+        if not rate_limit_ok(client_key(request)):
             raise HTTPException(status_code=429, detail="too many attempts, slow down")
         username = req.username.strip()
         if not username or not req.password:
@@ -125,7 +133,7 @@ def create_app(db_path: str = "myroomie.db") -> FastAPI:
 
     @app.post("/auth/login")
     def login(req: LoginRequest, request: Request) -> dict:
-        if not rate_limit_ok(request.client.host):
+        if not rate_limit_ok(client_key(request)):
             raise HTTPException(status_code=429, detail="too many attempts, slow down")
         username = req.username.strip()
         record = store.get_user(username)

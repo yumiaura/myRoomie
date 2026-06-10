@@ -168,6 +168,19 @@ def test_login_rate_limited(anon):
     assert 429 in statuses
 
 
+def test_rate_limit_keyed_by_forwarded_for(anon):
+    anon.post("/auth/register", json={"username": "fred", "password": "pw123456"})
+    busy = [
+        anon.post("/auth/login", json={"username": "fred", "password": "wrong"},
+                  headers={"X-Forwarded-For": "10.0.0.1"}).status_code
+        for attempt in range(15)
+    ]
+    assert 429 in busy  # one forwarded IP gets throttled
+    other = anon.post("/auth/login", json={"username": "fred", "password": "wrong"},
+                      headers={"X-Forwarded-For": "10.0.0.2"}).status_code
+    assert other != 429  # a different forwarded IP is still allowed
+
+
 def test_mark_inbox_seen(client):
     pet = create_roomie(client)
     assert any(not event["seen"] for event in pet["inbox"])
