@@ -16,6 +16,7 @@ from .models import (
     GiftRequest,
     PetState,
     PlayRequest,
+    PreviewRequest,
     Stats,
     Wallet,
     WorkRequest,
@@ -74,6 +75,13 @@ def create_app(db_path: str = "myroomie.db") -> FastAPI:
             if state is not None:
                 result.append({"id": state.id, "name": state.name, "gender": state.gender})
         return result
+
+    @app.post("/preview")
+    def preview(req: PreviewRequest) -> dict:
+        """Roll a personality for a seed without creating anything. Lets the
+        client show who is about to move in, and reroll until it clicks."""
+        seed = req.seed if req.seed is not None else random.randint(1, 2**31 - 1)
+        return {"seed": seed, "traits": generate_traits(seed)}
 
     @app.post("/pets", response_model=PetState)
     def create_pet(req: CreatePetRequest) -> PetState:

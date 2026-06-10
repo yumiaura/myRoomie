@@ -59,3 +59,17 @@ def test_catalog_lists_content(client):
 
 def test_unknown_pet_404(client):
     assert client.get("/pets/does-not-exist").status_code == 404
+
+
+def test_preview_is_deterministic_for_a_seed(client):
+    first = client.post("/preview", json={"seed": 999}).json()
+    second = client.post("/preview", json={"seed": 999}).json()
+    assert first["seed"] == 999
+    assert first["traits"] == second["traits"]
+
+
+def test_preview_without_seed_returns_one(client):
+    body = client.post("/preview", json={}).json()
+    assert isinstance(body["seed"], int)
+    assert body["traits"]["personality"]
+
