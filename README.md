@@ -50,6 +50,20 @@ myroomie                 # serves on http://127.0.0.1:8800
 
 Then open the `client/` folder in Godot 4.2+ and press ▶. Create your roomie and move in.
 
+### Build a desktop app
+
+Export the client to a standalone binary:
+
+```bash
+python3 main.py export --platform linux     # → client/build/myRoomie.x86_64
+python3 main.py export --platform windows    # → client/build/myRoomie.exe
+python3 main.py export --platform mac        # → client/build/myRoomie.app
+```
+
+This needs the Godot 4 editor (on your PATH or via the `GODOT` env var) plus the
+matching **export templates** installed (Editor → Manage Export Templates). Use
+`--out DIR` to change the output directory.
+
 ## Under the hood
 
 A **Godot 4** client talks to a **FastAPI** server over plain HTTP. The server owns the simulation — it ages every roomie forward to *now* on each request, so the world keeps turning even with the client closed. State lives in SQLite; personalities are generated from a seed, so they're reproducible.
