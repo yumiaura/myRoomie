@@ -74,6 +74,25 @@ def test_preview_without_seed_returns_one(client):
     assert body["traits"]["personality"]
 
 
+def test_catalog_includes_shop(client):
+    catalog = client.get("/catalog").json()
+    assert "shop" in catalog and "cozy_sweater" in catalog["shop"]
+
+
+def test_buy_and_wear_endpoints(client):
+    pet = create_roomie(client)
+    pid = pet["id"]
+    # earn enough first
+    for shift in range(3):
+        client.post(f"/pets/{pid}/work", json={"job": "tutoring"})
+    bought = client.post(f"/pets/{pid}/buy", json={"item": "summer_dress"}).json()
+    assert "summer_dress" in bought["wardrobe"]
+    assert bought["outfit"] == "summer_dress"
+    client.post(f"/pets/{pid}/buy", json={"item": "pajamas"})
+    worn = client.post(f"/pets/{pid}/wear", json={"item": "summer_dress"}).json()
+    assert worn["outfit"] == "summer_dress"
+
+
 def test_mark_inbox_seen(client):
     pet = create_roomie(client)
     assert any(not event["seen"] for event in pet["inbox"])

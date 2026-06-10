@@ -100,6 +100,19 @@ LOVE_LANGUAGE_GIFT = {
     "acts_of_service": {"flowers", "handwritten_letter"},
 }
 
+# Shop: clothing is worn (shows as the current outfit); decor is placed and
+# tidies the apartment a little. name -> {cost, kind, joy, mess_clear?}
+SHOP = {
+    "cozy_sweater": {"cost": 30, "kind": "clothing", "joy": 10},
+    "summer_dress": {"cost": 45, "kind": "clothing", "joy": 14},
+    "denim_jacket": {"cost": 40, "kind": "clothing", "joy": 12},
+    "pajamas": {"cost": 20, "kind": "clothing", "joy": 8},
+    "houseplant": {"cost": 25, "kind": "decor", "joy": 6, "mess_clear": 10},
+    "string_lights": {"cost": 35, "kind": "decor", "joy": 10, "mess_clear": 5},
+    "bookshelf": {"cost": 50, "kind": "decor", "joy": 8, "mess_clear": 15},
+    "rug": {"cost": 30, "kind": "decor", "joy": 7, "mess_clear": 8},
+}
+
 # Trait vocabularies ---------------------------------------------------
 PERSONALITIES = ["Sunny", "Shy", "Sassy", "Caring", "Dreamy", "Mischievous", "Calm", "Fiery"]
 LOVE_LANGUAGES = ["gifts", "quality_time", "words", "acts_of_service"]

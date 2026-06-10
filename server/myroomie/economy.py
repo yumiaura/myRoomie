@@ -140,6 +140,41 @@ def work(state: PetState, job: str, now: float) -> PetState:
     return state
 
 
+def buy(state: PetState, item: str, now: float) -> PetState:
+    if item not in config.SHOP:
+        raise ActionError(f"unknown item: {item}")
+    spec = config.SHOP[item]
+    if state.wallet.money < spec["cost"]:
+        raise ActionError("not enough money to buy that")
+    if spec["kind"] == "clothing":
+        if item in state.wardrobe:
+            raise ActionError("they already own that outfit")
+        state.wallet.money -= spec["cost"]
+        state.wardrobe.append(item)
+        state.outfit = item
+    else:  # decor
+        if item in state.decor:
+            raise ActionError("that's already in the apartment")
+        state.wallet.money -= spec["cost"]
+        state.decor.append(item)
+        state.apartment_mess = clamp(state.apartment_mess - spec.get("mess_clear", 0))
+    state.stats.mood = clamp(state.stats.mood + spec.get("joy", 0))
+    add_affection(state, 2, now)
+    register_presence(state)
+    grant_xp(state, 4)
+    refresh_mood(state)
+    return state
+
+
+def wear(state: PetState, item: str, now: float) -> PetState:
+    if item not in state.wardrobe:
+        raise ActionError("they don't own that yet")
+    state.outfit = item
+    state.stats.mood = clamp(state.stats.mood + 3)
+    refresh_mood(state)
+    return state
+
+
 def pay_rent(state: PetState, now: float) -> PetState:
     wallet = state.wallet
     if wallet.money < wallet.rent_amount:

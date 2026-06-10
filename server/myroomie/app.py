@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from . import __version__, config, economy
 from .models import (
+    BuyRequest,
     ChoreRequest,
     CreatePetRequest,
     FeedRequest,
@@ -19,6 +20,7 @@ from .models import (
     PreviewRequest,
     Stats,
     Wallet,
+    WearRequest,
     WorkRequest,
 )
 from .simulation import advance, clamp, push_event
@@ -65,6 +67,7 @@ def create_app(db_path: str = "myroomie.db") -> FastAPI:
             "activities": config.ACTIVITIES,
             "chores": config.CHORES,
             "jobs": config.JOBS,
+            "shop": config.SHOP,
         }
 
     @app.get("/pets")
@@ -148,6 +151,14 @@ def create_app(db_path: str = "myroomie.db") -> FastAPI:
     @app.post("/pets/{pet_id}/pay-rent", response_model=PetState)
     def pay_rent_pet(pet_id: str) -> PetState:
         return run_action(pet_id, economy.pay_rent)
+
+    @app.post("/pets/{pet_id}/buy", response_model=PetState)
+    def buy_item(pet_id: str, req: BuyRequest) -> PetState:
+        return run_action(pet_id, lambda state, now: economy.buy(state, req.item, now))
+
+    @app.post("/pets/{pet_id}/wear", response_model=PetState)
+    def wear_item(pet_id: str, req: WearRequest) -> PetState:
+        return run_action(pet_id, lambda state, now: economy.wear(state, req.item, now))
 
     @app.post("/pets/{pet_id}/inbox/seen", response_model=PetState)
     def mark_inbox_seen(pet_id: str) -> PetState:

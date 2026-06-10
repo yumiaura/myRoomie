@@ -60,6 +60,9 @@ class PetState(BaseModel):
     xp: int = 0
     relationship: str = config.RELATIONSHIP_STAGES[0]
     apartment_mess: float = 10.0
+    wardrobe: list[str] = Field(default_factory=list)
+    outfit: Optional[str] = None
+    decor: list[str] = Field(default_factory=list)
     created_at: float = 0.0
     last_tick: float = 0.0
     inbox: list[Event] = Field(default_factory=list)
@@ -94,3 +97,11 @@ class ChoreRequest(BaseModel):
 
 class WorkRequest(BaseModel):
     job: str
+
+
+class BuyRequest(BaseModel):
+    item: str
+
+
+class WearRequest(BaseModel):
+    item: str

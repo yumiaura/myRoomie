@@ -79,6 +79,38 @@ def test_gift_grants_affection():
     assert pet.stats.affection > affection_before
 
 
+def test_buy_clothing_adds_to_wardrobe_and_wears_it():
+    pet = make_pet()
+    pet.wallet.money = 100
+    economy.buy(pet, "cozy_sweater", NOW)
+    assert "cozy_sweater" in pet.wardrobe
+    assert pet.outfit == "cozy_sweater"
+    assert pet.wallet.money == 70
+
+
+def test_buy_duplicate_clothing_raises():
+    pet = make_pet()
+    pet.wallet.money = 100
+    economy.buy(pet, "cozy_sweater", NOW)
+    with pytest.raises(economy.ActionError):
+        economy.buy(pet, "cozy_sweater", NOW)
+
+
+def test_buy_decor_clears_mess():
+    pet = make_pet()
+    pet.wallet.money = 100
+    pet.apartment_mess = 50.0
+    economy.buy(pet, "bookshelf", NOW)
+    assert "bookshelf" in pet.decor
+    assert pet.apartment_mess < 50.0
+
+
+def test_wear_unowned_raises():
+    pet = make_pet()
+    with pytest.raises(economy.ActionError):
+        economy.wear(pet, "summer_dress", NOW)
+
+
 def test_leveling_up_from_xp():
     pet = make_pet()
     pet.stats.energy = 100.0
