@@ -7,6 +7,18 @@ from myroomie.app import create_app
 @pytest.fixture()
 def client(tmp_path):
     app = create_app(str(tmp_path / "test.db"))
+    authed = TestClient(app)
+    authed.post("/auth/register", json={"username": "tester", "password": "pw12345"})
+    token = authed.post("/auth/login", json={"username": "tester", "password": "pw12345"}).json()["token"]
+    authed.headers.update({"Authorization": f"Bearer {token}"})
+    return authed
+
+
+@pytest.fixture()
+def anon(tmp_path):
+    """A client sharing the same app/db as `client` is not trivial across
+    fixtures, so this gives a fresh unauthenticated client for auth tests."""
+    app = create_app(str(tmp_path / "test.db"))
     return TestClient(app)
 
 
@@ -59,6 +71,27 @@ def test_catalog_lists_content(client):
 
 def test_unknown_pet_404(client):
     assert client.get("/pets/does-not-exist").status_code == 404
+
+
+def test_register_and_login(anon):
+    assert anon.post("/auth/register", json={"username": "amy", "password": "secret1"}).status_code == 200
+    assert anon.post("/auth/register", json={"username": "amy", "password": "secret1"}).status_code == 409
+    body = anon.post("/auth/login", json={"username": "amy", "password": "secret1"}).json()
+    assert "token" in body
+    assert anon.post("/auth/login", json={"username": "amy", "password": "nope"}).status_code == 401
+
+
+def test_pet_endpoints_require_auth(anon):
+    assert anon.get("/pets").status_code == 401
+    assert anon.post("/pets", json={"name": "X", "gender": "girl"}).status_code == 401
+
+
+def test_cannot_access_another_users_roomie(client, anon):
+    pet = create_roomie(client)  # owned by "tester"
+    anon.post("/auth/register", json={"username": "intruder", "password": "pw123456"})
+    token = anon.post("/auth/login", json={"username": "intruder", "password": "pw123456"}).json()["token"]
+    resp = anon.get(f"/pets/{pet['id']}", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == 403
 
 
 def test_preview_is_deterministic_for_a_seed(client):

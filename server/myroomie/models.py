@@ -52,6 +52,7 @@ class PetState(BaseModel):
     id: str
     name: str
     gender: str          # "girl" or "boy"
+    owner: Optional[str] = None
     seed: int
     traits: Traits
     stats: Stats = Field(default_factory=Stats)
@@ -97,6 +98,16 @@ class ChoreRequest(BaseModel):
 
 class WorkRequest(BaseModel):
     job: str
+
+
+class RegisterRequest(BaseModel):
+    username: str
+    password: str
+
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
 
 
 class BuyRequest(BaseModel):

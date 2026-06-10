@@ -15,6 +15,13 @@ class Store:
         self.conn.execute(
             "CREATE TABLE IF NOT EXISTS pets (id TEXT PRIMARY KEY, data TEXT NOT NULL)"
         )
+        self.conn.execute(
+            "CREATE TABLE IF NOT EXISTS users "
+            "(username TEXT PRIMARY KEY, salt TEXT NOT NULL, pw_hash TEXT NOT NULL)"
+        )
+        self.conn.execute(
+            "CREATE TABLE IF NOT EXISTS tokens (token TEXT PRIMARY KEY, username TEXT NOT NULL)"
+        )
         self.conn.commit()
 
     def save(self, state: PetState) -> None:
@@ -35,3 +42,44 @@ class Store:
     def list_ids(self) -> list[str]:
         cursor = self.conn.execute("SELECT id FROM pets ORDER BY rowid")
         return [row[0] for row in cursor.fetchall()]
+
+    # --- Accounts ----------------------------------------------------
+    def create_user(self, username: str, salt: str, pw_hash: str) -> bool:
+        """Insert a user; return False if the username is already taken."""
+        with self.lock:
+            try:
+                self.conn.execute(
+                    "INSERT INTO users (username, salt, pw_hash) VALUES (?, ?, ?)",
+                    (username, salt, pw_hash),
+                )
+                self.conn.commit()
+                return True
+            except sqlite3.IntegrityError:
+                return False
+
+    def get_user(self, username: str) -> tuple[str, str] | None:
+        """Return (salt, pw_hash) for the user, or None."""
+        cursor = self.conn.execute(
+            "SELECT salt, pw_hash FROM users WHERE username = ?", (username,)
+        )
+        return cursor.fetchone()
+
+    def save_token(self, token: str, username: str) -> None:
+        with self.lock:
+            self.conn.execute(
+                "INSERT OR REPLACE INTO tokens (token, username) VALUES (?, ?)",
+                (token, username),
+            )
+            self.conn.commit()
+
+    def user_for_token(self, token: str) -> str | None:
+        cursor = self.conn.execute(
+            "SELECT username FROM tokens WHERE token = ?", (token,)
+        )
+        row = cursor.fetchone()
+        return row[0] if row else None
+
+    def delete_token(self, token: str) -> None:
+        with self.lock:
+            self.conn.execute("DELETE FROM tokens WHERE token = ?", (token,))
+            self.conn.commit()
