@@ -20,6 +20,7 @@ var header_label: Label
 var traits_label: Label
 var wallet_label: Label
 var status_label: Label
+var inbox_title: Label
 var inbox_box: VBoxContainer
 var bars: Dictionary = {}
 
@@ -147,10 +148,17 @@ func build_room_screen() -> void:
 
 	box.add_child(HSeparator.new())
 
-	var inbox_title := Label.new()
+	var inbox_header := HBoxContainer.new()
+	inbox_title = Label.new()
 	inbox_title.text = "Notes from them"
 	inbox_title.add_theme_font_size_override("font_size", 18)
-	box.add_child(inbox_title)
+	inbox_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	inbox_header.add_child(inbox_title)
+	var mark_read := Button.new()
+	mark_read.text = "Mark read"
+	mark_read.pressed.connect(on_mark_read)
+	inbox_header.add_child(mark_read)
+	box.add_child(inbox_header)
 
 	inbox_box = VBoxContainer.new()
 	inbox_box.add_theme_constant_override("separation", 6)
@@ -354,6 +362,16 @@ func update_inbox() -> void:
 		child.queue_free()
 	var inbox: Array = state["inbox"]
 	var count := inbox.size()
+
+	var unread := 0
+	for event in inbox:
+		if not event["seen"]:
+			unread += 1
+	if unread > 0:
+		inbox_title.text = "Notes from them (%d new)" % unread
+	else:
+		inbox_title.text = "Notes from them"
+
 	var shown := 0
 	for index in range(count - 1, -1, -1):
 		if shown >= 8:
@@ -361,6 +379,18 @@ func update_inbox() -> void:
 		var event: Dictionary = inbox[index]
 		var line := Label.new()
 		line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		line.text = "• " + str(event["text"])
+		if event["seen"]:
+			line.text = "• " + str(event["text"])
+			line.modulate = Color(0.7, 0.7, 0.7)
+		else:
+			line.text = "● " + str(event["text"])
 		inbox_box.add_child(line)
 		shown += 1
+
+
+func on_mark_read() -> void:
+	if Api.pet_id == "":
+		return
+	var result = await Api.post_json("/pets/%s/inbox/seen" % Api.pet_id)
+	if result["ok"]:
+		apply_state(result["data"])

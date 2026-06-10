@@ -73,3 +73,10 @@ def test_preview_without_seed_returns_one(client):
     assert isinstance(body["seed"], int)
     assert body["traits"]["personality"]
 
+
+def test_mark_inbox_seen(client):
+    pet = create_roomie(client)
+    assert any(not event["seen"] for event in pet["inbox"])
+    marked = client.post(f"/pets/{pet['id']}/inbox/seen").json()
+    assert all(event["seen"] for event in marked["inbox"])
+
