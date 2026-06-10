@@ -37,6 +37,8 @@ def test_create_pet_generates_traits(client):
     assert pet["traits"]["personality"]
     assert pet["wallet"]["money"] > 0
     assert any(event["kind"] == "welcome" for event in pet["inbox"])
+    assert pet["season"] in ("winter", "spring", "summer", "autumn")
+    assert any("moved in" in entry["text"].lower() for entry in pet["diary"])
 
 
 def test_create_pet_rejects_bad_gender(client):

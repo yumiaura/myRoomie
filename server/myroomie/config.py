@@ -122,6 +122,16 @@ LOVE_LANGUAGES = ["gifts", "quality_time", "words", "acts_of_service"]
 HOBBIES = ["painting", "guitar", "baking", "gaming", "gardening", "astronomy", "running", "photography"]
 FAVORITE_FOODS = list(FOODS.keys())
 
+# Seasons --------------------------------------------------------------
+SEASONS = ["winter", "spring", "summer", "autumn"]
+SEASON_MOOD_BONUS = 5
+SEASON_GREETING = {
+    "winter": "First frost on the window. {name} tugs a blanket over you both. ❄️",
+    "spring": "{name} threw the windows open — spring's finally here. 🌷",
+    "summer": "{name} is buzzing with summer plans. ☀️",
+    "autumn": "{name} brewed something warm; the leaves are turning. 🍂",
+}
+
 # Relationship ladder --------------------------------------------------
 RELATIONSHIP_STAGES = [
     "new_acquaintance",

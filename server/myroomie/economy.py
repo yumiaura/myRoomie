@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from . import config
 from .models import PetState
-from .simulation import clamp, push_event, refresh_mood
+from .simulation import clamp, push_diary, push_event, refresh_mood
 
 
 class ActionError(Exception):
@@ -25,6 +25,7 @@ def grant_xp(state: PetState, amount: int) -> None:
     while state.xp >= config.xp_to_next(state.level):
         state.xp -= config.xp_to_next(state.level)
         state.level += 1
+        push_diary(state, state.last_tick, "milestone", f"Reached level {state.level}.")
 
 
 def relationship_index(state: PetState) -> int:
@@ -40,6 +41,7 @@ def add_affection(state: PetState, amount: float, now: float) -> None:
             state, now, "relationship",
             f"Something shifted between you two. You're {state.relationship.replace('_', ' ')} now. 💞",
         )
+        push_diary(state, now, "milestone", f"Became {state.relationship.replace('_', ' ')}.")
     state.stats.affection = clamp(state.stats.affection)
 
 

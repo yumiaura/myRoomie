@@ -64,6 +64,8 @@ class PetState(BaseModel):
     wardrobe: list[str] = Field(default_factory=list)
     outfit: Optional[str] = None
     decor: list[str] = Field(default_factory=list)
+    season: str = ""
+    diary: list[Event] = Field(default_factory=list)
     created_at: float = 0.0
     last_tick: float = 0.0
     inbox: list[Event] = Field(default_factory=list)

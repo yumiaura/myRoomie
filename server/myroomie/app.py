@@ -26,7 +26,7 @@ from .models import (
     WearRequest,
     WorkRequest,
 )
-from .simulation import advance, clamp, push_event
+from .simulation import advance, clamp, current_season, push_diary, push_event
 from .storage import Store
 from .traits import generate_traits
 
@@ -145,6 +145,8 @@ def create_app(db_path: str = "myroomie.db") -> FastAPI:
             state, now, "welcome",
             f"Hi! I'm {state.name}. Thanks for taking me in — make yourself at home. 🏡",
         )
+        state.season = current_season(now)
+        push_diary(state, now, "milestone", "Moved in together. 🏡")
         store.save(state)
         return state
 

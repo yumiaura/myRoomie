@@ -8,11 +8,20 @@ quietly chip away at the rent while you are gone.
 from __future__ import annotations
 
 import random
+import time
 
 from . import config
 from .models import Event, PetState
 
 INBOX_LIMIT = 50
+DIARY_LIMIT = 50
+
+SEASON_BY_MONTH = {
+    12: "winter", 1: "winter", 2: "winter",
+    3: "spring", 4: "spring", 5: "spring",
+    6: "summer", 7: "summer", 8: "summer",
+    9: "autumn", 10: "autumn", 11: "autumn",
+}
 
 
 def clamp(value: float, low: float = 0.0, high: float = 100.0) -> float:
@@ -27,6 +36,29 @@ def push_event(state: PetState, now: float, kind: str, text: str) -> None:
     state.inbox.append(Event(at=now, kind=kind, text=text))
     if len(state.inbox) > INBOX_LIMIT:
         del state.inbox[: len(state.inbox) - INBOX_LIMIT]
+
+
+def push_diary(state: PetState, now: float, kind: str, text: str) -> None:
+    """A curated milestone log, kept separate from the noisy inbox."""
+    state.diary.append(Event(at=now, kind=kind, text=text))
+    if len(state.diary) > DIARY_LIMIT:
+        del state.diary[: len(state.diary) - DIARY_LIMIT]
+
+
+def current_season(now: float) -> str:
+    return SEASON_BY_MONTH[time.gmtime(now).tm_mon]
+
+
+def update_season(state: PetState, now: float) -> None:
+    new_season = current_season(now)
+    if not state.season:
+        state.season = new_season
+        return
+    if new_season != state.season:
+        state.season = new_season
+        push_event(state, now, "season", config.SEASON_GREETING[new_season].format(name=state.name))
+        push_diary(state, now, "season", f"The season turned to {new_season}.")
+        state.stats.mood = clamp(state.stats.mood + config.SEASON_MOOD_BONUS)
 
 
 def advance(state: PetState, now: float, rng: random.Random | None = None) -> PetState:
@@ -54,6 +86,7 @@ def advance(state: PetState, now: float, rng: random.Random | None = None) -> Pe
         apply_drift(state, remaining)
 
     update_rent(state, now)
+    update_season(state, now)
     refresh_mood(state)
     state.last_tick = now
     return state
