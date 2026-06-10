@@ -6,7 +6,15 @@ import random
 import time
 import uuid
 
-from fastapi import Depends, FastAPI, Header, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import (
+    Depends,
+    FastAPI,
+    Header,
+    HTTPException,
+    Request,
+    WebSocket,
+    WebSocketDisconnect,
+)
 from fastapi.middleware.cors import CORSMiddleware
 
 from . import __version__, auth, config, economy
@@ -40,12 +48,24 @@ def create_app(db_path: str = "myroomie.db") -> FastAPI:
         allow_headers=["*"],
     )
     store = Store(db_path)
+    auth_hits: dict[str, list[float]] = {}
+
+    def rate_limit_ok(key: str) -> bool:
+        now = time.time()
+        hits = [stamp for stamp in auth_hits.get(key, []) if now - stamp < auth.AUTH_RATE_WINDOW]
+        hits.append(now)
+        auth_hits[key] = hits
+        return len(hits) <= auth.AUTH_RATE_MAX
 
     def require_user(authorization: str = Header(default="")) -> str:
         token = authorization[7:] if authorization.startswith("Bearer ") else ""
-        username = store.user_for_token(token) if token else None
-        if username is None:
+        record = store.user_for_token(token) if token else None
+        if record is None:
             raise HTTPException(status_code=401, detail="not authenticated")
+        username, created_at = record
+        if auth.token_expired(created_at, time.time()):
+            store.delete_token(token)
+            raise HTTPException(status_code=401, detail="session expired")
         return username
 
     def load_live(pet_id: str, username: str) -> PetState:
@@ -92,7 +112,9 @@ def create_app(db_path: str = "myroomie.db") -> FastAPI:
 
     # --- Accounts ----------------------------------------------------
     @app.post("/auth/register")
-    def register(req: RegisterRequest) -> dict:
+    def register(req: RegisterRequest, request: Request) -> dict:
+        if not rate_limit_ok(request.client.host):
+            raise HTTPException(status_code=429, detail="too many attempts, slow down")
         username = req.username.strip()
         if not username or not req.password:
             raise HTTPException(status_code=400, detail="username and password required")
@@ -102,14 +124,23 @@ def create_app(db_path: str = "myroomie.db") -> FastAPI:
         return {"status": "registered", "username": username}
 
     @app.post("/auth/login")
-    def login(req: LoginRequest) -> dict:
+    def login(req: LoginRequest, request: Request) -> dict:
+        if not rate_limit_ok(request.client.host):
+            raise HTTPException(status_code=429, detail="too many attempts, slow down")
         username = req.username.strip()
         record = store.get_user(username)
         if record is None or not auth.verify_password(req.password, record[0], record[1]):
             raise HTTPException(status_code=401, detail="invalid credentials")
         token = auth.generate_token()
-        store.save_token(token, username)
+        store.save_token(token, username, time.time())
         return {"token": token, "username": username}
+
+    @app.post("/auth/logout")
+    def logout(authorization: str = Header(default="")) -> dict:
+        token = authorization[7:] if authorization.startswith("Bearer ") else ""
+        if token:
+            store.delete_token(token)
+        return {"status": "logged out"}
 
     # --- Roomies (require auth) --------------------------------------
     @app.get("/pets")
@@ -211,10 +242,11 @@ def create_app(db_path: str = "myroomie.db") -> FastAPI:
         """Live state stream. Auth rides in the query string (`?token=`)
         because WebSocket clients can't easily set headers. Pushes a fresh,
         time-advanced snapshot every WS_PUSH_SECONDS until the client leaves."""
-        username = store.user_for_token(token) if token else None
-        if username is None:
+        record = store.user_for_token(token) if token else None
+        if record is None or auth.token_expired(record[1], time.time()):
             await websocket.close(code=4401)
             return
+        username = record[0]
         owner_state = store.get(pet_id)
         if owner_state is None or owner_state.owner != username:
             await websocket.close(code=4404)

@@ -20,8 +20,16 @@ class Store:
             "(username TEXT PRIMARY KEY, salt TEXT NOT NULL, pw_hash TEXT NOT NULL)"
         )
         self.conn.execute(
-            "CREATE TABLE IF NOT EXISTS tokens (token TEXT PRIMARY KEY, username TEXT NOT NULL)"
+            "CREATE TABLE IF NOT EXISTS tokens "
+            "(token TEXT PRIMARY KEY, username TEXT NOT NULL, "
+            "created_at REAL NOT NULL DEFAULT 0)"
         )
+        try:
+            self.conn.execute(
+                "ALTER TABLE tokens ADD COLUMN created_at REAL NOT NULL DEFAULT 0"
+            )
+        except sqlite3.OperationalError:
+            pass
         self.conn.commit()
 
     def save(self, state: PetState) -> None:
@@ -64,20 +72,22 @@ class Store:
         )
         return cursor.fetchone()
 
-    def save_token(self, token: str, username: str) -> None:
+    def save_token(self, token: str, username: str, created_at: float) -> None:
         with self.lock:
             self.conn.execute(
-                "INSERT OR REPLACE INTO tokens (token, username) VALUES (?, ?)",
-                (token, username),
+                "INSERT OR REPLACE INTO tokens (token, username, created_at) "
+                "VALUES (?, ?, ?)",
+                (token, username, created_at),
             )
             self.conn.commit()
 
-    def user_for_token(self, token: str) -> str | None:
+    def user_for_token(self, token: str) -> tuple[str, float] | None:
+        """Return (username, created_at) for the token, or None."""
         cursor = self.conn.execute(
-            "SELECT username FROM tokens WHERE token = ?", (token,)
+            "SELECT username, created_at FROM tokens WHERE token = ?", (token,)
         )
         row = cursor.fetchone()
-        return row[0] if row else None
+        return (row[0], row[1]) if row else None
 
     def delete_token(self, token: str) -> None:
         with self.lock:
