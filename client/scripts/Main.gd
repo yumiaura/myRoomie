@@ -55,6 +55,7 @@ func _ready() -> void:
 	auth_root.visible = false
 	creation_root.visible = false
 	room_root.visible = false
+	Api.unauthorized.connect(on_session_expired)
 
 	poll_timer = Timer.new()
 	poll_timer.wait_time = POLL_SECONDS
@@ -397,12 +398,28 @@ func after_login() -> void:
 
 func on_logout() -> void:
 	stop_live_updates()
+	if Api.token != "":
+		await Api.post_json("/auth/logout")  # revoke the token server-side
 	Api.token = ""
 	Api.pet_id = ""
 	state = {}
 	config_set("token", "")
 	clear_saved_pet_id()
 	show_auth()
+
+
+func on_session_expired() -> void:
+	# Fired by Api when an authenticated request comes back 401 (token expired
+	# or revoked). Drop the dead session and send the player back to sign-in.
+	if auth_root.visible:
+		return
+	stop_live_updates()
+	Api.token = ""
+	Api.pet_id = ""
+	state = {}
+	config_set("token", "")
+	show_auth()
+	auth_status.text = "Session expired — please sign in again."
 
 
 # --- Flow -----------------------------------------------------------------
