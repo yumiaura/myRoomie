@@ -33,14 +33,22 @@ Come home often. They notice.
 
 ## Quickstart
 
-**Server** (Python 3.10+):
+**No install** — from the repo root (needs `fastapi`, `uvicorn`, `pydantic`, and Godot 4 on your PATH):
+
+```bash
+python3 main.py            # starts the server and launches the client
+# python3 main.py server   # server only, on http://127.0.0.1:8800
+# python3 main.py client   # client only
+```
+
+**Or install the server** (Python 3.10+):
 
 ```bash
 pip install -e .
-myroomie                 # serves on http://127.0.0.1:8000
+myroomie                 # serves on http://127.0.0.1:8800
 ```
 
-**Client** (Godot 4.2+): open the `client/` folder in Godot and press ▶. Create your roomie and move in.
+Then open the `client/` folder in Godot 4.2+ and press ▶. Create your roomie and move in.
 
 ## Under the hood
 
