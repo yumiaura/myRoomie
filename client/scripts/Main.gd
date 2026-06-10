@@ -4,6 +4,7 @@ extends Control
 
 const STAT_KEYS := ["hunger", "hygiene", "energy", "mood", "health", "loneliness", "affection"]
 const POLL_SECONDS := 5.0
+const SAVE_PATH := "user://myroomie.cfg"
 
 var catalog: Dictionary = {}
 var state: Dictionary = {}
@@ -49,6 +50,15 @@ func _ready() -> void:
 	if loaded["ok"]:
 		catalog = loaded["data"]
 		populate_catalogs()
+
+	# If we lived with someone last time and they still exist, walk right in.
+	var saved := load_saved_pet_id()
+	if saved != "":
+		var existing = await Api.get_json("/pets/%s" % saved)
+		if existing["ok"]:
+			await enter_room(existing["data"], true)
+			return
+		clear_saved_pet_id()  # they're gone from the server; forget the stale id
 	do_reroll()
 
 
@@ -165,6 +175,9 @@ func build_room_screen() -> void:
 	inbox_box.add_theme_constant_override("separation", 6)
 	box.add_child(inbox_box)
 
+	box.add_child(HSeparator.new())
+	box.add_child(make_simple_action("Switch roomie", on_move_out))
+
 	room_root = wrap_in_scroll(box)
 	add_child(room_root)
 
@@ -258,15 +271,52 @@ func on_move_in() -> void:
 	if not result["ok"]:
 		status_label.text = str(result["error"])
 		return
-	Api.pet_id = result["data"]["id"]
+	await enter_room(result["data"], true)
+
+
+func enter_room(data: Dictionary, comfort_on_entry: bool) -> void:
+	Api.pet_id = data["id"]
+	save_pet_id(Api.pet_id)
 	current_mood = ""
-	apply_state(result["data"])
-	var visited = await Api.post_json("/pets/%s/visit" % Api.pet_id)
-	if visited["ok"]:
-		apply_state(visited["data"])
+	apply_state(data)
+	if comfort_on_entry:
+		var visited = await Api.post_json("/pets/%s/visit" % Api.pet_id)
+		if visited["ok"]:
+			apply_state(visited["data"])
 	creation_root.visible = false
 	room_root.visible = true
 	poll_timer.start()
+
+
+func on_move_out() -> void:
+	poll_timer.stop()
+	clear_saved_pet_id()
+	Api.pet_id = ""
+	state = {}
+	current_mood = ""
+	room_root.visible = false
+	creation_root.visible = true
+	name_edit.text = ""
+	do_reroll()
+
+
+func save_pet_id(pet_id: String) -> void:
+	var cfg := ConfigFile.new()
+	cfg.set_value("session", "pet_id", pet_id)
+	cfg.save(SAVE_PATH)
+
+
+func load_saved_pet_id() -> String:
+	var cfg := ConfigFile.new()
+	if cfg.load(SAVE_PATH) != OK:
+		return ""
+	return str(cfg.get_value("session", "pet_id", ""))
+
+
+func clear_saved_pet_id() -> void:
+	var cfg := ConfigFile.new()
+	cfg.set_value("session", "pet_id", "")
+	cfg.save(SAVE_PATH)
 
 
 func on_poll() -> void:
