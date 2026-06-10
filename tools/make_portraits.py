@@ -6,12 +6,14 @@ Replace these with real art later; the file names are the contract.
 """
 from __future__ import annotations
 
+import json
 import os
 
 from PIL import Image, ImageDraw
 
 SIZE = 256
 OUT_DIR = os.path.join("client", "assets", "portraits")
+GENDERS = ("girl", "boy")
 
 SKIN = (255, 224, 196)
 BLUSH = (255, 170, 170)
@@ -96,15 +98,30 @@ DECOR = {
 }
 
 
-def render_outfit(item: str) -> Image.Image:
+def render_outfit(item: str, gender: str | None = None) -> Image.Image:
+    """Render a transparent torso overlay for an outfit item.
+
+    When gender is None a neutral fallback silhouette is produced. When a
+    gender is given the garment hem is reshaped: the girl variant flares
+    out and rounds at the hem, the boy variant stays boxier and squarer.
+    """
     color = OUTFITS[item]
     image = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
     draw = ImageDraw.Draw(image)
-    if item == "summer_dress":
+    if gender == "girl":
+        # Wider, flared hem with a rounded sweep below the shoulders.
+        shoulders = [(98, 170), (158, 170), (202, 236), (54, 236)]
+    elif gender == "boy":
+        # Boxier, narrower hem that stays close to vertical.
+        shoulders = [(98, 170), (158, 170), (172, 236), (84, 236)]
+    elif item == "summer_dress":
         shoulders = [(98, 170), (158, 170), (196, 236), (60, 236)]   # flared
     else:
         shoulders = [(96, 170), (160, 170), (184, 236), (72, 236)]
     draw.polygon(shoulders, fill=color)
+    if gender == "girl":
+        # Rounded hem flourish for the flared silhouette.
+        draw.pieslice([54, 214, 202, 258], start=0, end=180, fill=color)
     draw.ellipse([114, 150, 142, 182], fill=SKIN)                    # neck gap
     draw.line([(110, 176), (146, 176)], fill=(0, 0, 0, 60), width=3)  # collar hint
     return image
@@ -131,9 +148,41 @@ def render_decor(item: str) -> Image.Image:
     return image
 
 
+def build_manifest() -> dict:
+    """Describe the art contract so real artists can drop in replacements."""
+    guidelines = (
+        "Replace every PNG in this directory with real art using the exact "
+        "same file names; the names are the contract. All images are "
+        f"{SIZE}x{SIZE} pixels. Portraits ({{gender}}_{{mood}}.png) may be "
+        "opaque. Outfit overlays and decor icons must be RGBA with a fully "
+        "transparent background so they layer cleanly over the portrait. "
+        "Prefer a per-gender outfit overlay named outfit_{item}_{gender}.png; "
+        "the client falls back to the gender-agnostic outfit_{item}.png when a "
+        "per-gender file is missing. Align outfit overlays to the torso so the "
+        "neckline sits just below the chin (around y=170 on a 256px canvas). "
+        "Keep decor icons centered with generous transparent padding."
+    )
+    return {
+        "canvas_size": SIZE,
+        "overlay_format": "RGBA with fully transparent background",
+        "portrait_format": "RGB or RGBA, opaque background allowed",
+        "genders": list(GENDERS),
+        "moods": list(MOODS),
+        "outfit_items": list(OUTFITS),
+        "decor_items": list(DECOR),
+        "naming": {
+            "portrait": "{gender}_{mood}.png",
+            "outfit_per_gender": "outfit_{item}_{gender}.png",
+            "outfit_fallback": "outfit_{item}.png",
+            "decor": "decor_{item}.png",
+        },
+        "guidelines": guidelines,
+    }
+
+
 def main() -> None:
     os.makedirs(OUT_DIR, exist_ok=True)
-    for gender in ("girl", "boy"):
+    for gender in GENDERS:
         for mood in MOODS:
             path = os.path.join(OUT_DIR, f"{gender}_{mood}.png")
             render(gender, mood).save(path)
@@ -142,10 +191,19 @@ def main() -> None:
         path = os.path.join(OUT_DIR, f"outfit_{item}.png")
         render_outfit(item).save(path)
         print("wrote", path)
+        for gender in GENDERS:
+            gender_path = os.path.join(OUT_DIR, f"outfit_{item}_{gender}.png")
+            render_outfit(item, gender).save(gender_path)
+            print("wrote", gender_path)
     for item in DECOR:
         path = os.path.join(OUT_DIR, f"decor_{item}.png")
         render_decor(item).save(path)
         print("wrote", path)
+    manifest_path = os.path.join(OUT_DIR, "manifest.json")
+    with open(manifest_path, "w", encoding="utf-8") as handle:
+        json.dump(build_manifest(), handle, indent=2)
+        handle.write("\n")
+    print("wrote", manifest_path)
 
 
 if __name__ == "__main__":

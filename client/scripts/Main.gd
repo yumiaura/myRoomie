@@ -615,9 +615,13 @@ func update_wardrobe() -> void:
 		decor_text = ", ".join(names)
 	outfit_label.text = "Wearing: %s · Decor: %s" % [worn, decor_text]
 
-	# Layer the worn outfit over the portrait.
-	if outfit != null and ResourceLoader.exists("res://assets/portraits/outfit_%s.png" % str(outfit)):
-		outfit_overlay.texture = load("res://assets/portraits/outfit_%s.png" % str(outfit))
+	# Layer the worn outfit over the portrait, preferring per-gender art.
+	var per_gender := "res://assets/portraits/outfit_%s_%s.png" % [str(outfit), str(state["gender"])]
+	var generic := "res://assets/portraits/outfit_%s.png" % str(outfit)
+	if outfit != null and ResourceLoader.exists(per_gender):
+		outfit_overlay.texture = load(per_gender)
+	elif outfit != null and ResourceLoader.exists(generic):
+		outfit_overlay.texture = load(generic)
 	else:
 		outfit_overlay.texture = null
 
