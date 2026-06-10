@@ -4,6 +4,7 @@ extends Node
 
 var base_url := "http://127.0.0.1:8000"
 var pet_id := ""
+var token := ""
 
 
 ## Perform a request and return {ok, data} or {ok=false, error}.
@@ -12,6 +13,8 @@ func send(method: int, path: String, payload = null) -> Dictionary:
 	var http := HTTPRequest.new()
 	add_child(http)
 	var headers := PackedStringArray(["Content-Type: application/json"])
+	if token != "":
+		headers.append("Authorization: Bearer " + token)
 	var body := ""
 	if payload != null:
 		body = JSON.stringify(payload)

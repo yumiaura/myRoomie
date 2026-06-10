@@ -9,6 +9,11 @@ const SAVE_PATH := "user://myroomie.cfg"
 var catalog: Dictionary = {}
 var state: Dictionary = {}
 
+var auth_root: Control
+var username_edit: LineEdit
+var password_edit: LineEdit
+var auth_status: Label
+
 var creation_root: Control
 var room_root: Control
 var name_edit: LineEdit
@@ -40,8 +45,11 @@ var poll_timer: Timer
 
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
+	build_auth_screen()
 	build_creation_screen()
 	build_room_screen()
+	auth_root.visible = false
+	creation_root.visible = false
 	room_root.visible = false
 
 	poll_timer = Timer.new()
@@ -54,15 +62,17 @@ func _ready() -> void:
 		catalog = loaded["data"]
 		populate_catalogs()
 
-	# If we lived with someone last time and they still exist, walk right in.
-	var saved := load_saved_pet_id()
-	if saved != "":
-		var existing = await Api.get_json("/pets/%s" % saved)
-		if existing["ok"]:
-			await enter_room(existing["data"], true)
+	# Reuse a saved session token if it still works; otherwise ask to sign in.
+	var saved_token := config_get("token")
+	if saved_token != "":
+		Api.token = saved_token
+		var check = await Api.get_json("/pets")
+		if check["ok"]:
+			await after_login()
 			return
-		clear_saved_pet_id()  # they're gone from the server; forget the stale id
-	do_reroll()
+		Api.token = ""
+		config_set("token", "")
+	show_auth()
 
 
 # --- Screen construction --------------------------------------------------
@@ -80,6 +90,49 @@ func wrap_in_scroll(inner: Control) -> ScrollContainer:
 	margin.add_child(inner)
 	inner.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	return scroll
+
+
+func build_auth_screen() -> void:
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 14)
+
+	var title := Label.new()
+	title.text = "myRoomie"
+	title.add_theme_font_size_override("font_size", 40)
+	box.add_child(title)
+
+	var subtitle := Label.new()
+	subtitle.text = "Sign in, or create an account to get started."
+	box.add_child(subtitle)
+
+	username_edit = LineEdit.new()
+	username_edit.placeholder_text = "Username"
+	box.add_child(username_edit)
+
+	password_edit = LineEdit.new()
+	password_edit.placeholder_text = "Password"
+	password_edit.secret = true
+	box.add_child(password_edit)
+
+	var buttons := HBoxContainer.new()
+	var login_button := Button.new()
+	login_button.text = "Log in"
+	login_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	login_button.pressed.connect(on_login)
+	buttons.add_child(login_button)
+	var register_button := Button.new()
+	register_button.text = "Register"
+	register_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	register_button.pressed.connect(on_register)
+	buttons.add_child(register_button)
+	box.add_child(buttons)
+
+	auth_status = Label.new()
+	auth_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(auth_status)
+
+	auth_root = wrap_in_scroll(box)
+	add_child(auth_root)
 
 
 func build_creation_screen() -> void:
@@ -122,6 +175,8 @@ func build_creation_screen() -> void:
 	status_label = Label.new()
 	status_label.modulate = Color(1, 0.5, 0.5)
 	box.add_child(status_label)
+
+	box.add_child(make_simple_action("Log out", on_logout))
 
 	creation_root = wrap_in_scroll(box)
 	add_child(creation_root)
@@ -266,6 +321,67 @@ func selected(option: OptionButton) -> String:
 	return option.get_item_text(option.selected).replace(" ", "_")
 
 
+# --- Auth flow ------------------------------------------------------------
+func show_auth() -> void:
+	auth_root.visible = true
+	creation_root.visible = false
+	room_root.visible = false
+
+
+func show_creation() -> void:
+	auth_root.visible = false
+	creation_root.visible = true
+	room_root.visible = false
+	name_edit.text = ""
+	do_reroll()
+
+
+func on_register() -> void:
+	var result = await Api.post_json("/auth/register", {
+		"username": username_edit.text.strip_edges(),
+		"password": password_edit.text,
+	})
+	if result["ok"]:
+		auth_status.text = "Account created — now log in."
+	else:
+		auth_status.text = str(result["error"])
+
+
+func on_login() -> void:
+	var result = await Api.post_json("/auth/login", {
+		"username": username_edit.text.strip_edges(),
+		"password": password_edit.text,
+	})
+	if not result["ok"]:
+		auth_status.text = str(result["error"])
+		return
+	Api.token = str(result["data"]["token"])
+	await after_login()
+
+
+func after_login() -> void:
+	config_set("token", Api.token)
+	# If we lived with someone last time and they still exist, walk right in.
+	var saved := load_saved_pet_id()
+	if saved != "":
+		var existing = await Api.get_json("/pets/%s" % saved)
+		if existing["ok"]:
+			await enter_room(existing["data"], true)
+			return
+		clear_saved_pet_id()
+	show_creation()
+
+
+func on_logout() -> void:
+	poll_timer.stop()
+	Api.token = ""
+	Api.pet_id = ""
+	state = {}
+	config_set("token", "")
+	clear_saved_pet_id()
+	show_auth()
+
+
 # --- Flow -----------------------------------------------------------------
 func do_reroll() -> void:
 	var result = await Api.post_json("/preview", {})
@@ -307,6 +423,7 @@ func enter_room(data: Dictionary, comfort_on_entry: bool) -> void:
 		var visited = await Api.post_json("/pets/%s/visit" % Api.pet_id)
 		if visited["ok"]:
 			apply_state(visited["data"])
+	auth_root.visible = false
 	creation_root.visible = false
 	room_root.visible = true
 	poll_timer.start()
@@ -318,29 +435,33 @@ func on_move_out() -> void:
 	Api.pet_id = ""
 	state = {}
 	current_mood = ""
-	room_root.visible = false
-	creation_root.visible = true
-	name_edit.text = ""
-	do_reroll()
+	show_creation()
 
 
-func save_pet_id(pet_id: String) -> void:
+func config_set(key: String, value: String) -> void:
 	var cfg := ConfigFile.new()
-	cfg.set_value("session", "pet_id", pet_id)
+	cfg.load(SAVE_PATH)  # keep any existing keys; a missing file is fine
+	cfg.set_value("session", key, value)
 	cfg.save(SAVE_PATH)
 
 
-func load_saved_pet_id() -> String:
+func config_get(key: String) -> String:
 	var cfg := ConfigFile.new()
 	if cfg.load(SAVE_PATH) != OK:
 		return ""
-	return str(cfg.get_value("session", "pet_id", ""))
+	return str(cfg.get_value("session", key, ""))
+
+
+func save_pet_id(pet_id: String) -> void:
+	config_set("pet_id", pet_id)
+
+
+func load_saved_pet_id() -> String:
+	return config_get("pet_id")
 
 
 func clear_saved_pet_id() -> void:
-	var cfg := ConfigFile.new()
-	cfg.set_value("session", "pet_id", "")
-	cfg.save(SAVE_PATH)
+	config_set("pet_id", "")
 
 
 func on_poll() -> void:
