@@ -2,6 +2,9 @@ extends Node
 ## Thin async wrapper around the myRoomie HTTP server.
 ## Registered as an autoload singleton named "Api".
 
+## Emitted when an authenticated request is rejected (token missing/expired).
+signal unauthorized
+
 var base_url := "http://127.0.0.1:8800"
 var pet_id := ""
 var token := ""
@@ -50,6 +53,8 @@ func send(method: int, path: String, payload = null) -> Dictionary:
 	var detail := "request failed (%d)" % code
 	if typeof(data) == TYPE_DICTIONARY and data.has("detail"):
 		detail = str(data["detail"])
+	if code == 401 and token != "":
+		unauthorized.emit()  # token expired or revoked mid-session
 	return {"ok": false, "error": detail, "code": code}
 
 
