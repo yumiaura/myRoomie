@@ -144,6 +144,30 @@ def test_buy_and_wear_endpoints(client):
     assert worn["outfit"] == "summer_dress"
 
 
+def test_logout_revokes_token(client):
+    assert client.get("/pets").status_code == 200
+    assert client.post("/auth/logout").status_code == 200
+    assert client.get("/pets").status_code == 401
+
+
+def test_expired_token_rejected(anon, monkeypatch):
+    anon.post("/auth/register", json={"username": "ezra", "password": "pw123456"})
+    token = anon.post("/auth/login", json={"username": "ezra", "password": "pw123456"}).json()["token"]
+    from myroomie import auth
+    monkeypatch.setattr(auth, "TOKEN_TTL_SECONDS", -1)
+    resp = anon.get("/pets", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == 401
+
+
+def test_login_rate_limited(anon):
+    anon.post("/auth/register", json={"username": "nora", "password": "pw123456"})
+    statuses = []
+    for attempt in range(15):
+        resp = anon.post("/auth/login", json={"username": "nora", "password": "wrong"})
+        statuses.append(resp.status_code)
+    assert 429 in statuses
+
+
 def test_mark_inbox_seen(client):
     pet = create_roomie(client)
     assert any(not event["seen"] for event in pet["inbox"])
