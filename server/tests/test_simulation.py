@@ -70,6 +70,23 @@ def test_autonomous_buy_fills_wardrobe():
     assert pet.wallet.money < 100
 
 
+def test_current_season_from_timestamp():
+    from myroomie.simulation import current_season
+    assert current_season(1609459200.0) == "winter"  # 2021-01-01 UTC
+    assert current_season(1625097600.0) == "summer"   # 2021-07-01 UTC
+
+
+def test_season_change_announces_itself():
+    winter_ts = 1609459200.0  # January
+    pet = make_pet(now=winter_ts)
+    pet.season = "summer"
+    pet.last_tick = winter_ts - 3600
+    advance(pet, winter_ts, rng=random.Random(0))
+    assert pet.season == "winter"
+    assert any(event.kind == "season" for event in pet.inbox)
+    assert any(event.kind == "season" for event in pet.diary)
+
+
 def test_neglect_eventually_harms_health():
     now = 1_000_000.0
     pet = make_pet(now=now)

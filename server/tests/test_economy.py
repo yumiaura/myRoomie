@@ -119,3 +119,4 @@ def test_leveling_up_from_xp():
         pet.stats.energy = 100.0
         economy.play(pet, "dance", NOW)
     assert pet.level > level_before
+    assert any("level" in entry.text.lower() for entry in pet.diary)

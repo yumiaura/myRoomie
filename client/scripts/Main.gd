@@ -29,6 +29,7 @@ var wallet_label: Label
 var status_label: Label
 var inbox_title: Label
 var inbox_box: VBoxContainer
+var diary_box: VBoxContainer
 var bars: Dictionary = {}
 
 var food_option: OptionButton
@@ -245,6 +246,15 @@ func build_room_screen() -> void:
 	inbox_box = VBoxContainer.new()
 	inbox_box.add_theme_constant_override("separation", 6)
 	box.add_child(inbox_box)
+
+	box.add_child(HSeparator.new())
+	var diary_title := Label.new()
+	diary_title.text = "Diary"
+	diary_title.add_theme_font_size_override("font_size", 18)
+	box.add_child(diary_title)
+	diary_box = VBoxContainer.new()
+	diary_box.add_theme_constant_override("separation", 6)
+	box.add_child(diary_box)
 
 	box.add_child(HSeparator.new())
 	box.add_child(make_simple_action("Switch roomie", on_move_out))
@@ -532,12 +542,16 @@ func apply_state(data: Dictionary) -> void:
 	update_wardrobe()
 	update_portrait()
 	update_inbox()
+	update_diary()
 
 
 func update_header() -> void:
 	if state.is_empty():
 		return
 	header_label.text = "%s · %s · Lv %d" % [state["name"], str(state["relationship"]).replace("_", " "), int(state["level"])]
+	var season := str(state.get("season", ""))
+	if season != "":
+		header_label.text += " · " + season
 
 
 func update_traits() -> void:
@@ -661,3 +675,21 @@ func on_mark_read() -> void:
 	var result = await Api.post_json("/pets/%s/inbox/seen" % Api.pet_id)
 	if result["ok"]:
 		apply_state(result["data"])
+
+
+func update_diary() -> void:
+	if state.is_empty():
+		return
+	for child in diary_box.get_children():
+		child.queue_free()
+	var diary: Array = state.get("diary", [])
+	var shown := 0
+	for index in range(diary.size() - 1, -1, -1):
+		if shown >= 8:
+			break
+		var entry: Dictionary = diary[index]
+		var line := Label.new()
+		line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		line.text = "✦ " + str(entry["text"])
+		diary_box.add_child(line)
+		shown += 1
