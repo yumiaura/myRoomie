@@ -4,6 +4,7 @@
     python3 main.py            # start the server AND launch the Godot client
     python3 main.py server     # server only (http://127.0.0.1:8000)
     python3 main.py client     # launch the Godot client only
+    python3 main.py export --platform linux   # export a desktop binary
 
 The server needs only the Python deps (fastapi, uvicorn, pydantic) — no
 `pip install` of myRoomie itself; this script puts `server/` on the path.
@@ -63,6 +64,45 @@ def launch_client(server_url: str) -> subprocess.Popen | None:
     return subprocess.Popen([godot, "--path", CLIENT_DIR, "--", "--server", server_url])
 
 
+EXPORT_PRESETS = {
+    "linux": ("Linux/X11", "myRoomie.x86_64"),
+    "windows": ("Windows Desktop", "myRoomie.exe"),
+    "mac": ("macOS", "myRoomie.app"),
+}
+
+
+def run_export(platform: str, out: str) -> int:
+    """Export the Godot client to a desktop binary. Returns a process-style code."""
+    preset, filename = EXPORT_PRESETS[platform]
+    godot = find_godot()
+    if godot is None:
+        print(
+            "\nGodot 4 was not found on your PATH, so the client cannot be exported.\n"
+            "To build a desktop binary you need:\n"
+            "  1. The Godot 4 editor — https://godotengine.org/ (or set the GODOT env var)\n"
+            "  2. The matching export templates for that Godot version\n"
+            "     (Editor → Editor → Manage Export Templates → Download and Install).\n"
+            f"Then re-run:  python3 main.py export --platform {platform}\n"
+        )
+        return 1
+
+    os.makedirs(out, exist_ok=True)
+    target = os.path.join(out, filename)
+    print(f"Exporting myRoomie ({preset}) → {target}")
+    print(f"Using Godot at: {godot}")
+    completed = subprocess.run(
+        [godot, "--headless", "--path", CLIENT_DIR, "--export-release", preset, target]
+    )
+    if completed.returncode == 0:
+        print(f"Done. Binary written to {target}")
+    else:
+        print(
+            f"Godot export failed (exit code {completed.returncode}). "
+            "The most common cause is missing export templates for this Godot version."
+        )
+    return completed.returncode
+
+
 def wait_for_server(host: str, port: int, timeout: float = 20.0) -> bool:
     url = f"http://{host}:{port}/health"
     deadline = time.time() + timeout
@@ -102,10 +142,14 @@ def run_both(host: str, port: int, db: str) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Launch the myRoomie server and/or client.")
-    parser.add_argument("mode", nargs="?", default="both", choices=["both", "server", "client"])
+    parser.add_argument("mode", nargs="?", default="both", choices=["both", "server", "client", "export"])
     parser.add_argument("--host", default=DEFAULT_HOST)
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
     parser.add_argument("--db", default=os.path.join(ROOT, "myroomie.db"), help="SQLite database path")
+    parser.add_argument("--platform", default="linux", choices=["linux", "windows", "mac"],
+                        help="target platform for `export` mode")
+    parser.add_argument("--out", default=os.path.join(CLIENT_DIR, "build"),
+                        help="output directory for `export` mode")
     args = parser.parse_args()
 
     if args.mode == "server":
@@ -115,6 +159,8 @@ def main() -> None:
         if client is None:
             sys.exit(1)
         client.wait()
+    elif args.mode == "export":
+        sys.exit(run_export(args.platform, args.out))
     else:
         run_both(args.host, args.port, args.db)
 

@@ -16,7 +16,7 @@ dist/
 # Godot import cache & exports
 client/.godot/
 client/android/
-client/export_presets.cfg
+client/build/
 *.import
 
 # OS / editor
