@@ -17,6 +17,9 @@ TIME_SCALE = 1.0
 CATCHUP_CHUNK_MIN = 60.0
 CATCHUP_MAX_CHUNKS = 480
 
+# How often a live WebSocket connection pushes fresh state (real seconds).
+WS_PUSH_SECONDS = 3.0
+
 # Baseline per-minute stat drift, before personality modifiers ----------
 HUNGER_DECAY_PER_MIN = 0.7
 HYGIENE_DECAY_PER_MIN = 0.5

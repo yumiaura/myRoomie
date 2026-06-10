@@ -73,6 +73,22 @@ def test_unknown_pet_404(client):
     assert client.get("/pets/does-not-exist").status_code == 404
 
 
+def test_websocket_streams_state(client):
+    pet = create_roomie(client)
+    token = client.headers["Authorization"].split(" ")[1]
+    with client.websocket_connect(f"/pets/{pet['id']}/ws?token={token}") as ws:
+        data = ws.receive_json()
+        assert data["id"] == pet["id"]
+        assert "stats" in data
+
+
+def test_websocket_rejects_bad_token(client):
+    pet = create_roomie(client)
+    with pytest.raises(Exception):
+        with client.websocket_connect(f"/pets/{pet['id']}/ws?token=bogus") as ws:
+            ws.receive_json()
+
+
 def test_register_and_login(anon):
     assert anon.post("/auth/register", json={"username": "amy", "password": "secret1"}).status_code == 200
     assert anon.post("/auth/register", json={"username": "amy", "password": "secret1"}).status_code == 409

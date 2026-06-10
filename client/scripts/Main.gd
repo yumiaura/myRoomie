@@ -41,6 +41,7 @@ var wear_option: OptionButton
 var outfit_label: Label
 
 var poll_timer: Timer
+var socket: WebSocketPeer = null
 
 
 func _ready() -> void:
@@ -373,7 +374,7 @@ func after_login() -> void:
 
 
 func on_logout() -> void:
-	poll_timer.stop()
+	stop_live_updates()
 	Api.token = ""
 	Api.pet_id = ""
 	state = {}
@@ -426,11 +427,11 @@ func enter_room(data: Dictionary, comfort_on_entry: bool) -> void:
 	auth_root.visible = false
 	creation_root.visible = false
 	room_root.visible = true
-	poll_timer.start()
+	start_live_updates()
 
 
 func on_move_out() -> void:
-	poll_timer.stop()
+	stop_live_updates()
 	clear_saved_pet_id()
 	Api.pet_id = ""
 	state = {}
@@ -470,6 +471,39 @@ func on_poll() -> void:
 	var result = await Api.get_json("/pets/%s" % Api.pet_id)
 	if result["ok"]:
 		apply_state(result["data"])
+
+
+# --- Live updates: prefer a WebSocket, fall back to polling ---------------
+func start_live_updates() -> void:
+	var ws_url := Api.base_url.replace("https://", "wss://").replace("http://", "ws://")
+	ws_url += "/pets/%s/ws?token=%s" % [Api.pet_id, Api.token]
+	socket = WebSocketPeer.new()
+	if socket.connect_to_url(ws_url) != OK:
+		socket = null
+		poll_timer.start()  # couldn't open a socket; poll instead
+
+
+func stop_live_updates() -> void:
+	if socket != null:
+		socket.close()
+		socket = null
+	poll_timer.stop()
+
+
+func _process(delta: float) -> void:
+	if socket == null:
+		return
+	socket.poll()
+	var ready_state := socket.get_ready_state()
+	if ready_state == WebSocketPeer.STATE_OPEN:
+		while socket.get_available_packet_count() > 0:
+			var text := socket.get_packet().get_string_from_utf8()
+			var data = JSON.parse_string(text)
+			if typeof(data) == TYPE_DICTIONARY:
+				apply_state(data)
+	elif ready_state == WebSocketPeer.STATE_CLOSED:
+		socket = null
+		poll_timer.start()  # connection dropped; fall back to polling
 
 
 func on_action(action_path: String, payload = null) -> void:
