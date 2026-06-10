@@ -37,9 +37,23 @@ def advance(state: PetState, now: float, rng: random.Random | None = None) -> Pe
     if elapsed <= 0.0:
         return state
     minutes = (elapsed * config.TIME_SCALE) / 60.0
-    apply_drift(state, minutes)
+
+    # Replay the absence in chunks so a long time away produces a believable
+    # trail of events, not a single one.
+    remaining = minutes
+    chunks = 0
+    while remaining > 0.0 and chunks < config.CATCHUP_MAX_CHUNKS:
+        step = min(config.CATCHUP_CHUNK_MIN, remaining)
+        apply_drift(state, step)
+        spawn_autonomous_events(state, step, now, rng)
+        remaining -= step
+        chunks += 1
+    if remaining > 0.0:
+        # Absence longer than we simulate event-by-event: apply the rest as
+        # plain drift so stats stay accurate without flooding the inbox.
+        apply_drift(state, remaining)
+
     update_rent(state, now)
-    spawn_autonomous_events(state, minutes, now, rng)
     refresh_mood(state)
     state.last_tick = now
     return state
