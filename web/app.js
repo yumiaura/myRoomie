@@ -1,19 +1,21 @@
 "use strict";
 
-// Served from the same origin as the API, so the base is empty.
+// 2D point-and-click client. Served from the same origin as the API.
 const STAT_KEYS = ["hunger", "hygiene", "energy", "mood", "health", "loneliness", "affection"];
 const POLL_MS = 5000;
+const t = (key) => window.I18n.t(key);
 
 let catalog = {};
 let state = {};
+let currentScene = "apartment";
+let openPanelBuilder = null;
 let pollHandle = null;
 
-function token() { return localStorage.getItem("token") || ""; }
-function setToken(value) { value ? localStorage.setItem("token", value) : localStorage.removeItem("token"); }
-function petId() { return localStorage.getItem("pet_id") || ""; }
-function setPetId(value) { value ? localStorage.setItem("pet_id", value) : localStorage.removeItem("pet_id"); }
-
 const el = (id) => document.getElementById(id);
+const token = () => localStorage.getItem("token") || "";
+const setToken = (v) => { v ? localStorage.setItem("token", v) : localStorage.removeItem("token"); };
+const petId = () => localStorage.getItem("pet_id") || "";
+const setPetId = (v) => { v ? localStorage.setItem("pet_id", v) : localStorage.removeItem("pet_id"); };
 
 async function api(path, method = "GET", body = null) {
   const headers = { "Content-Type": "application/json" };
@@ -22,34 +24,82 @@ async function api(path, method = "GET", body = null) {
   try {
     response = await fetch(path, { method, headers, body: body == null ? null : JSON.stringify(body) });
   } catch (err) {
-    return { ok: false, status: 0, error: "server is offline" };
+    return { ok: false, status: 0, error: t("toast.offline") };
   }
   let data = null;
   const text = await response.text();
   if (text) { try { data = JSON.parse(text); } catch (err) { data = null; } }
   if (response.status === 401 && token()) onSessionExpired();
   if (response.ok) return { ok: true, status: response.status, data };
-  const detail = data && data.detail ? data.detail : "request failed (" + response.status + ")";
-  return { ok: false, status: response.status, error: detail };
+  return { ok: false, status: response.status, error: (data && data.detail) || ("error " + response.status) };
+}
+
+// --- Toast / screens -----------------------------------------------------
+let toastTimer = null;
+function toast(message) {
+  const node = el("toast");
+  node.textContent = message;
+  node.classList.remove("hidden");
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => node.classList.add("hidden"), 2200);
 }
 
 function showScreen(name) {
   for (const id of ["auth", "creation", "room"]) el(id).classList.toggle("hidden", id !== name);
+  el("top-logout").classList.toggle("hidden", name === "auth");
+}
+
+// --- i18n chrome ---------------------------------------------------------
+function buildLangSwitch() {
+  const box = el("lang-switch");
+  box.innerHTML = "";
+  for (const lang of window.I18n.LANGS) {
+    const button = document.createElement("button");
+    button.textContent = lang.toUpperCase();
+    button.classList.toggle("active", lang === window.I18n.getLang());
+    button.onclick = () => window.I18n.setLang(lang);
+    box.appendChild(button);
+  }
+}
+
+function applyChrome() {
+  el("auth-subtitle").textContent = t("auth.subtitle");
+  el("username").placeholder = t("auth.username");
+  el("password").placeholder = t("auth.password");
+  el("login-btn").textContent = t("btn.login");
+  el("register-btn").textContent = t("btn.register");
+  el("create-subtitle").textContent = t("create.subtitle");
+  el("roomie-name").placeholder = t("create.name");
+  el("reroll-btn").textContent = t("create.reroll");
+  el("movein-btn").textContent = t("create.movein");
+  if (!el("preview").dataset.set) el("preview").textContent = t("create.rolling");
+  el("gender").options[0].textContent = t("gender.girl");
+  el("gender").options[1].textContent = t("gender.boy");
+  el("top-logout").textContent = t("btn.logout");
+  el("panel-close").textContent = t("btn.close");
+  buildLangSwitch();
+}
+
+function onLangChanged() {
+  applyChrome();
+  if (!el("room").classList.contains("hidden")) {
+    setScene(currentScene);
+    renderHud();
+  }
+  if (openPanelBuilder) openPanelBuilder();
 }
 
 // --- Auth ----------------------------------------------------------------
 async function onRegister() {
   const res = await api("/auth/register", "POST", { username: el("username").value.trim(), password: el("password").value });
-  el("auth-status").textContent = res.ok ? "Account created — now log in." : res.error;
+  el("auth-status").textContent = res.ok ? t("auth.created") : res.error;
 }
-
 async function onLogin() {
   const res = await api("/auth/login", "POST", { username: el("username").value.trim(), password: el("password").value });
   if (!res.ok) { el("auth-status").textContent = res.error; return; }
   setToken(res.data.token);
   await afterLogin();
 }
-
 async function afterLogin() {
   if (petId()) {
     const existing = await api("/pets/" + petId());
@@ -59,34 +109,32 @@ async function afterLogin() {
   showScreen("creation");
   reroll();
 }
-
 async function onLogout() {
   stopPolling();
   if (token()) await api("/auth/logout", "POST");
   setToken(""); setPetId(""); state = {};
   showScreen("auth");
 }
-
 function onSessionExpired() {
   stopPolling();
   setToken(""); state = {};
   showScreen("auth");
-  el("auth-status").textContent = "Session expired — please sign in again.";
+  el("auth-status").textContent = t("auth.expired");
 }
 
 // --- Creation ------------------------------------------------------------
 let previewSeed = 0;
 async function reroll() {
   const res = await api("/preview", "POST", {});
-  if (!res.ok) { el("preview").textContent = "(server unavailable)"; return; }
+  if (!res.ok) { el("preview").textContent = res.error; return; }
   previewSeed = res.data.seed;
-  const t = res.data.traits;
-  el("preview").textContent = `${t.personality} · loves ${t.love_language.replace(/_/g, " ")} · into ${t.hobby} · favourite food: ${t.favorite_food.replace(/_/g, " ")}`;
+  const tr = res.data.traits;
+  el("preview").dataset.set = "1";
+  el("preview").textContent = `${tr.personality} · ${tr.love_language.replace(/_/g, " ")} · ${tr.hobby} · ${t(tr.favorite_food)}`;
 }
-
 async function onMoveIn() {
   const name = el("roomie-name").value.trim();
-  if (!name) { el("create-status").textContent = "Give them a name first."; return; }
+  if (!name) { el("create-status").textContent = t("create.needname"); return; }
   const payload = { name, gender: el("gender").value };
   if (previewSeed) payload.seed = previewSeed;
   const res = await api("/pets", "POST", payload);
@@ -95,81 +143,49 @@ async function onMoveIn() {
   enterRoom(visited.ok ? visited.data : res.data);
 }
 
-// --- Room ----------------------------------------------------------------
+// --- Room / scenes -------------------------------------------------------
 function enterRoom(data) {
   setPetId(data.id);
+  state = data;
   showScreen("room");
-  render(data);
+  setScene("apartment");
+  renderHud();
   startPolling();
 }
 
-async function poll() {
-  if (!petId()) return;
-  const res = await api("/pets/" + petId());
-  if (res.ok) render(res.data);
-}
-function startPolling() { stopPolling(); pollHandle = setInterval(poll, POLL_MS); }
-function stopPolling() { if (pollHandle) { clearInterval(pollHandle); pollHandle = null; } }
-
-async function act(path, body = null) {
-  if (!petId()) return;
-  const res = await api("/pets/" + petId() + path, "POST", body);
-  if (res.ok) render(res.data);
-  else el("header").textContent = "⚠ " + res.error;
-}
-
-async function onMoveOut() {
-  stopPolling();
-  setPetId(""); state = {};
-  showScreen("creation");
-  reroll();
-}
-
-async function onMarkRead() {
-  if (!petId()) return;
-  const res = await api("/pets/" + petId() + "/inbox/seen", "POST");
-  if (res.ok) render(res.data);
-}
-
-// Build the catalog-driven action controls once.
-function buildActions() {
-  const make = (container, label, items, handler) => {
-    const row = document.createElement("div");
-    row.className = "action-row";
-    const select = document.createElement("select");
-    for (const key of items) {
-      const opt = document.createElement("option");
-      opt.value = key; opt.textContent = key.replace(/_/g, " ");
-      select.appendChild(opt);
-    }
+function setScene(name) {
+  currentScene = name;
+  const scene = window.SCENES[name];
+  el("scene-bg").src = scene.bg;
+  const layer = el("hotspots");
+  layer.innerHTML = "";
+  for (const spot of scene.hotspots) {
     const button = document.createElement("button");
-    button.textContent = label;
-    button.onclick = () => handler(select.value);
-    row.appendChild(select); row.appendChild(button);
-    container.appendChild(row);
-    return select;
-  };
-  const simple = (container, label, handler) => {
-    const button = document.createElement("button");
-    button.textContent = label; button.onclick = handler;
-    container.appendChild(button);
-  };
-  const actions = el("actions");
-  actions.innerHTML = "";
-  make(actions, "Feed", Object.keys(catalog.foods || {}), (v) => act("/feed", { food: v }));
-  simple(actions, "Wash", () => act("/wash"));
-  make(actions, "Play", Object.keys(catalog.activities || {}), (v) => act("/play", { activity: v }));
-  make(actions, "Gift", Object.keys(catalog.gifts || {}), (v) => act("/gift", { item: v }));
-  make(actions, "Chore", Object.keys(catalog.chores || {}), (v) => act("/chore", { task: v }));
-  make(actions, "Work", Object.keys(catalog.jobs || {}), (v) => act("/work", { job: v }));
-  simple(actions, "Pay rent", () => act("/pay-rent"));
-
-  const shop = el("shop-actions");
-  shop.innerHTML = "";
-  make(shop, "Buy", Object.keys(catalog.shop || {}), (v) => act("/buy", { item: v }));
-  wearSelect = make(shop, "Wear", [], (v) => v && act("/wear", { item: v }));
+    button.className = "hotspot";
+    button.style.left = spot.x + "%";
+    button.style.top = spot.y + "%";
+    button.style.width = spot.w + "%";
+    button.style.height = spot.h + "%";
+    const chip = document.createElement("span");
+    chip.className = "chip";
+    chip.textContent = t(spot.label);
+    button.appendChild(chip);
+    button.onclick = () => runAction(spot.action);
+    layer.appendChild(button);
+  }
+  // Roomie avatar only stands in the apartment.
+  const avatar = el("avatar");
+  if (name === "apartment" && scene.avatar) {
+    avatar.classList.remove("hidden");
+    avatar.style.left = scene.avatar.x + "%";
+    avatar.style.top = scene.avatar.y + "%";
+    avatar.style.width = scene.avatar.w + "%";
+    avatar.style.height = scene.avatar.h + "%";
+    updateAvatar();
+  } else {
+    avatar.classList.add("hidden");
+  }
 }
-let wearSelect = null;
 
 function moodKey(s) {
   if (s.health < 30) return "sick";
@@ -177,92 +193,162 @@ function moodKey(s) {
   if (s.mood > 70) return "happy";
   return "neutral";
 }
-
-function render(data) {
-  state = data;
-  el("header").textContent = `${data.name} · ${String(data.relationship).replace(/_/g, " ")} · Lv ${data.level}` + (data.season ? " · " + data.season : "");
-  const t = data.traits;
-  el("traits").textContent = `${t.personality} · loves ${t.love_language.replace(/_/g, " ")} · into ${t.hobby} · favourite food: ${t.favorite_food.replace(/_/g, " ")}`;
-  const w = data.wallet;
-  el("wallet").textContent = `💰 ${w.money} coins   ·   🏠 rent ${w.rent_amount}` + (w.rent_overdue ? " (OVERDUE!)" : "");
-
-  const bars = el("bars");
-  bars.innerHTML = "";
-  for (const key of STAT_KEYS) {
-    const value = Math.round(data.stats[key]);
-    const div = document.createElement("div");
-    div.className = "bar";
-    div.innerHTML = `<div class="label"><span>${key}</span><span>${value}</span></div><div class="track"><div class="fill" style="width:${value}%"></div></div>`;
-    bars.appendChild(div);
-  }
-
-  // Portrait + outfit overlay (prefer per-gender art, fall back, else hide).
-  el("portrait").src = `/assets/${data.gender}_${moodKey(data.stats)}.png`;
-  const outfitImg = el("outfit");
-  if (data.outfit) {
-    outfitImg.style.display = "block";
-    outfitImg.onerror = () => { outfitImg.onerror = () => { outfitImg.style.display = "none"; }; outfitImg.src = `/assets/outfit_${data.outfit}.png`; };
-    outfitImg.src = `/assets/outfit_${data.outfit}_${data.gender}.png`;
+function updateAvatar() {
+  if (!state.stats) return;
+  el("avatar-portrait").src = `/assets/${state.gender}_${moodKey(state.stats)}.png`;
+  const outfit = el("avatar-outfit");
+  if (state.outfit) {
+    outfit.style.display = "block";
+    outfit.onerror = () => { outfit.onerror = () => { outfit.style.display = "none"; }; outfit.src = `/assets/outfit_${state.outfit}.png`; };
+    outfit.src = `/assets/outfit_${state.outfit}_${state.gender}.png`;
   } else {
-    outfitImg.style.display = "none";
+    outfit.style.display = "none";
   }
-
-  // Wardrobe / decor.
-  const worn = data.outfit ? String(data.outfit).replace(/_/g, " ") : "nothing in particular";
-  const decorNames = (data.decor || []).map((d) => d.replace(/_/g, " "));
-  el("outfit-label").textContent = `Wearing: ${worn} · Decor: ${decorNames.length ? decorNames.join(", ") : "none"}`;
-  if (wearSelect) {
-    wearSelect.innerHTML = "";
-    for (const item of (data.wardrobe || [])) {
-      const opt = document.createElement("option");
-      opt.value = item; opt.textContent = item.replace(/_/g, " ");
-      wearSelect.appendChild(opt);
-    }
-  }
-  const decor = el("decor");
-  decor.innerHTML = "";
-  for (const item of (data.decor || [])) {
-    const img = document.createElement("img");
-    img.src = `/assets/decor_${item}.png`; img.alt = item;
-    decor.appendChild(img);
-  }
-
-  renderFeed("inbox", data.inbox, true);
-  renderFeed("diary", data.diary, false, "✦ ");
-  const unread = (data.inbox || []).filter((e) => !e.seen).length;
-  el("inbox-title").textContent = unread > 0 ? `Notes from them (${unread} new)` : "Notes from them";
 }
 
-function renderFeed(containerId, items, markUnread, prefix) {
-  const box = el(containerId);
-  box.innerHTML = "";
+function renderHud() {
+  if (!state.stats) return;
+  const w = state.wallet;
+  const rent = `${t("hud.rent")} ${w.rent_amount}` + (w.rent_overdue ? " " + t("hud.overdue") : "");
+  el("topbar-info").textContent =
+    `${t("loc." + currentScene)}  ·  💰 ${w.money} ${t("hud.coins")}  ·  🏠 ${rent}  ·  ${t("rel." + state.relationship)}  ·  Lv ${state.level}` +
+    (state.season ? "  ·  " + t("season." + state.season) : "");
+  const hud = el("hud");
+  hud.innerHTML = "";
+  for (const key of STAT_KEYS) {
+    const value = Math.round(state.stats[key]);
+    const div = document.createElement("div");
+    div.className = "stat";
+    div.innerHTML = `<div class="label"><span>${t("stat." + key)}</span><span>${value}</span></div><div class="track"><div class="fill" style="width:${value}%"></div></div>`;
+    hud.appendChild(div);
+  }
+}
+
+// --- Actions / panels ----------------------------------------------------
+function runAction(action) {
+  if (action.kind === "goto") { setScene(action.to); renderHud(); return; }
+  if (action.kind === "act") { doAction(action.path); return; }
+  if (action.kind === "hint") { toast(t(action.key)); return; }
+  if (action.kind === "notes") { openNotes(); return; }
+  if (action.kind === "work") { openPicker("panel.work", "jobs", "/work", "job"); return; }
+  if (action.kind === "panel") {
+    if (action.source === "wardrobe") openWardrobe(action);
+    else openPicker(action.title, action.category, action.path, action.field);
+  }
+}
+
+async function doAction(path, body = null) {
+  if (!petId()) return;
+  const res = await api("/pets/" + petId() + path, "POST", body);
+  if (res.ok) { state = res.data; updateAvatar(); renderHud(); if (openPanelBuilder) openPanelBuilder(); }
+  else toast(res.error);
+}
+
+function costLabel(category, value) {
+  if (category === "foods") return `−${value[1]}⛁`;
+  if (category === "gifts") return `−${value[0]}⛁`;
+  if (category === "shop") return `−${value.cost}⛁`;
+  if (category === "activities") return `−${value[2]}⚡`;
+  if (category === "chores") return `−${value[1]}⚡`;
+  if (category === "jobs") return `+${value[0]}⛁`;
+  return "";
+}
+
+function openPicker(titleKey, category, path, field) {
+  openPanelBuilder = () => {
+    const items = catalog[category] || {};
+    const rows = Object.keys(items).map((key) => ({ key, sub: costLabel(category, items[key]) }));
+    renderPanel(titleKey, rows, (key) => doAction(path, { [field]: key }));
+  };
+  openPanelBuilder();
+}
+
+function openWardrobe(action) {
+  openPanelBuilder = () => {
+    const rows = (state.wardrobe || []).map((key) => ({ key, sub: "" }));
+    renderPanel(action.title, rows, (key) => doAction(action.path, { [action.field]: key }));
+  };
+  openPanelBuilder();
+}
+
+function renderPanel(titleKey, rows, onPick) {
+  el("panel-title").textContent = t(titleKey);
+  const body = el("panel-body");
+  body.innerHTML = "";
+  if (!rows.length) {
+    const p = document.createElement("p");
+    p.className = "muted";
+    p.textContent = t("panel.empty");
+    body.appendChild(p);
+  }
+  for (const row of rows) {
+    const button = document.createElement("button");
+    button.className = "pick";
+    button.innerHTML = `<span>${t(row.key)}</span><span class="cost">${row.sub}</span>`;
+    button.onclick = () => onPick(row.key);
+    body.appendChild(button);
+  }
+  el("panel-overlay").classList.remove("hidden");
+}
+
+function openNotes() {
+  openPanelBuilder = () => {
+    el("panel-title").textContent = t("notes.title");
+    const body = el("panel-body");
+    body.innerHTML = "";
+    const unread = (state.inbox || []).filter((e) => !e.seen).length;
+    const markBtn = document.createElement("button");
+    markBtn.textContent = t("notes.markread") + (unread ? ` (${unread} ${t("notes.new")})` : "");
+    markBtn.onclick = async () => { const r = await api("/pets/" + petId() + "/inbox/seen", "POST"); if (r.ok) { state = r.data; openPanelBuilder(); renderHud(); } };
+    body.appendChild(markBtn);
+    appendFeed(body, state.inbox, true);
+    const diaryTitle = document.createElement("h3");
+    diaryTitle.textContent = t("diary.title");
+    body.appendChild(diaryTitle);
+    appendFeed(body, state.diary, false);
+    el("panel-overlay").classList.remove("hidden");
+  };
+  openPanelBuilder();
+}
+
+function appendFeed(parent, items, markUnread) {
   const list = (items || []).slice(-8).reverse();
   for (const entry of list) {
     const div = document.createElement("div");
-    div.className = "item";
-    if (markUnread) {
-      div.classList.add(entry.seen ? "seen" : "unread");
-      div.textContent = (entry.seen ? "• " : "● ") + entry.text;
-    } else {
-      div.textContent = (prefix || "") + entry.text;
-    }
-    box.appendChild(div);
+    div.className = "feed-item" + (markUnread ? (entry.seen ? " seen" : " unread") : "");
+    div.textContent = (markUnread ? (entry.seen ? "• " : "● ") : "✦ ") + entry.text;
+    parent.appendChild(div);
   }
 }
 
+function closePanel() {
+  openPanelBuilder = null;
+  el("panel-overlay").classList.add("hidden");
+}
+
+// --- Polling -------------------------------------------------------------
+async function poll() {
+  if (!petId()) return;
+  const res = await api("/pets/" + petId());
+  if (res.ok) { state = res.data; updateAvatar(); renderHud(); }
+}
+function startPolling() { stopPolling(); pollHandle = setInterval(poll, POLL_MS); }
+function stopPolling() { if (pollHandle) { clearInterval(pollHandle); pollHandle = null; } }
+
 // --- Boot ----------------------------------------------------------------
 async function init() {
+  window.I18n.onChange(onLangChanged);
+  applyChrome();
   el("login-btn").onclick = onLogin;
   el("register-btn").onclick = onRegister;
   el("reroll-btn").onclick = reroll;
   el("movein-btn").onclick = onMoveIn;
-  el("creation-logout").onclick = onLogout;
-  el("switch-btn").onclick = onMoveOut;
-  el("logout-btn").onclick = onLogout;
-  el("mark-read").onclick = onMarkRead;
+  el("top-logout").onclick = onLogout;
+  el("panel-close").onclick = closePanel;
+  el("panel-overlay").onclick = (e) => { if (e.target === el("panel-overlay")) closePanel(); };
 
   const cat = await api("/catalog");
-  if (cat.ok) { catalog = cat.data; buildActions(); }
+  if (cat.ok) catalog = cat.data;
 
   if (token()) {
     const check = await api("/pets");
