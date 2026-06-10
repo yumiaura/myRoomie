@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import random
 import time
 import uuid
@@ -16,6 +17,7 @@ from fastapi import (
     WebSocketDisconnect,
 )
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from . import __version__, auth, config, economy
 from .models import (
@@ -271,6 +273,16 @@ def create_app(db_path: str = "myroomie.db") -> FastAPI:
                 await asyncio.sleep(config.WS_PUSH_SECONDS)
         except WebSocketDisconnect:
             return
+
+    # Serve the static web client and portrait assets when present. Mounted
+    # last so every API/WS route above takes precedence; "/" serves the SPA.
+    base = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    assets_dir = os.path.join(base, "client", "assets", "portraits")
+    web_dir = os.path.join(base, "web")
+    if os.path.isdir(assets_dir):
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+    if os.path.isdir(web_dir):
+        app.mount("/", StaticFiles(directory=web_dir, html=True), name="web")
 
     return app
 

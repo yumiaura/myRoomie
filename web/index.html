@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>myRoomie</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+
+  <section id="auth" class="screen">
+    <h1>myRoomie</h1>
+    <p class="muted">Sign in, or create an account to get started.</p>
+    <input id="username" placeholder="Username" autocomplete="username">
+    <input id="password" type="password" placeholder="Password" autocomplete="current-password">
+    <div class="row">
+      <button id="login-btn">Log in</button>
+      <button id="register-btn">Register</button>
+    </div>
+    <p id="auth-status" class="status"></p>
+  </section>
+
+  <section id="creation" class="screen hidden">
+    <h1>myRoomie</h1>
+    <p class="muted">Someone is about to move in. Who is it?</p>
+    <input id="roomie-name" placeholder="Their name">
+    <select id="gender"><option value="girl">girl</option><option value="boy">boy</option></select>
+    <button id="reroll-btn">🎲 Reroll personality</button>
+    <p id="preview" class="muted">Rolling a personality…</p>
+    <button id="movein-btn" class="primary">Move in</button>
+    <p id="create-status" class="status"></p>
+    <button id="creation-logout" class="ghost">Log out</button>
+  </section>
+
+  <section id="room" class="screen hidden">
+    <div class="portrait-wrap">
+      <img id="portrait" alt="roomie">
+      <img id="outfit" class="overlay" alt="">
+    </div>
+    <h2 id="header"></h2>
+    <p id="traits" class="muted"></p>
+    <p id="wallet"></p>
+    <div id="bars"></div>
+    <hr>
+    <div id="actions"></div>
+    <hr>
+    <h3>Shop &amp; wardrobe</h3>
+    <div id="shop-actions"></div>
+    <p id="outfit-label" class="muted"></p>
+    <div id="decor" class="decor"></div>
+    <hr>
+    <div class="row"><h3 id="inbox-title" class="grow">Notes from them</h3><button id="mark-read">Mark read</button></div>
+    <div id="inbox" class="feed"></div>
+    <hr>
+    <h3>Diary</h3>
+    <div id="diary" class="feed"></div>
+    <hr>
+    <div class="row"><button id="switch-btn">Switch roomie</button><button id="logout-btn">Log out</button></div>
+  </section>
+
+</div>
+<script src="app.js"></script>
+</body>
+</html>
