@@ -116,13 +116,20 @@ def spawn_autonomous_events(state: PetState, minutes: float, now: float, rng: ra
     # Impulse shopping — more likely for a low-thriftiness roomie.
     shop_chance = clamp_prob((1.1 - traits.thriftiness / 100.0) * 0.25 * hours)
     if state.wallet.money > 25 and rng.random() < shop_chance:
-        spent = rng.randint(10, min(40, state.wallet.money))
-        state.wallet.money -= spent
-        state.stats.mood = clamp(state.stats.mood + 6)
-        push_event(
-            state, now, "shopping",
-            f"{state.name} treated themselves to a new outfit (-{spent} coins). \"Do I look cute? 🛍️\"",
-        )
+        bought = autonomous_buy(state, rng)
+        if bought is not None:
+            push_event(
+                state, now, "shopping",
+                f"{state.name} came home with a new {bought.replace('_', ' ')}. \"Do I look cute? 🛍️\"",
+            )
+        else:
+            spent = rng.randint(10, min(40, state.wallet.money))
+            state.wallet.money -= spent
+            state.stats.mood = clamp(state.stats.mood + 6)
+            push_event(
+                state, now, "shopping",
+                f"{state.name} treated themselves to a little something (-{spent} coins). 🛍️",
+            )
 
     # Missing you when the loneliness builds up.
     if state.stats.loneliness > 55 and rng.random() < clamp_prob(0.4 * hours):
@@ -140,6 +147,27 @@ def spawn_autonomous_events(state: PetState, minutes: float, now: float, rng: ra
     # Getting sick when health bottoms out.
     if state.stats.health < 30 and rng.random() < clamp_prob(0.3 * hours):
         push_event(state, now, "sick", f"{state.name} isn't feeling well and curled up under a blanket. 🤒")
+
+
+def autonomous_buy(state: PetState, rng: random.Random) -> str | None:
+    """The roomie buys a clothing item they don't own yet and puts it on.
+    Returns the item name, or None if they own everything affordable."""
+    options = [
+        name
+        for name, spec in config.SHOP.items()
+        if spec["kind"] == "clothing"
+        and name not in state.wardrobe
+        and spec["cost"] <= state.wallet.money
+    ]
+    if not options:
+        return None
+    choice = rng.choice(options)
+    spec = config.SHOP[choice]
+    state.wallet.money -= spec["cost"]
+    state.wardrobe.append(choice)
+    state.outfit = choice
+    state.stats.mood = clamp(state.stats.mood + spec.get("joy", 0))
+    return choice
 
 
 LONELY_LINES = [

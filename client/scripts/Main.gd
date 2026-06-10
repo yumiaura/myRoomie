@@ -31,6 +31,9 @@ var activity_option: OptionButton
 var gift_option: OptionButton
 var chore_option: OptionButton
 var job_option: OptionButton
+var shop_option: OptionButton
+var wear_option: OptionButton
+var outfit_label: Label
 
 var poll_timer: Timer
 
@@ -159,6 +162,18 @@ func build_room_screen() -> void:
 
 	box.add_child(HSeparator.new())
 
+	var shop_title := Label.new()
+	shop_title.text = "Shop & wardrobe"
+	shop_title.add_theme_font_size_override("font_size", 18)
+	box.add_child(shop_title)
+	shop_option = make_action_row(box, "Buy", func(): on_action("/buy", {"item": selected(shop_option)}))
+	wear_option = make_action_row(box, "Wear", func(): on_action("/wear", {"item": selected(wear_option)}))
+	outfit_label = Label.new()
+	outfit_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(outfit_label)
+
+	box.add_child(HSeparator.new())
+
 	var inbox_header := HBoxContainer.new()
 	inbox_title = Label.new()
 	inbox_title.text = "Notes from them"
@@ -226,6 +241,7 @@ func populate_catalogs() -> void:
 	fill_option(gift_option, catalog.get("gifts", {}))
 	fill_option(chore_option, catalog.get("chores", {}))
 	fill_option(job_option, catalog.get("jobs", {}))
+	fill_option(shop_option, catalog.get("shop", {}))
 
 
 func fill_option(option: OptionButton, items: Dictionary) -> void:
@@ -234,6 +250,14 @@ func fill_option(option: OptionButton, items: Dictionary) -> void:
 	option.clear()
 	for key in items.keys():
 		option.add_item(str(key).replace("_", " "))
+
+
+func fill_option_list(option: OptionButton, items: Array) -> void:
+	if option == null:
+		return
+	option.clear()
+	for item in items:
+		option.add_item(str(item).replace("_", " "))
 
 
 func selected(option: OptionButton) -> String:
@@ -350,6 +374,7 @@ func apply_state(data: Dictionary) -> void:
 	update_traits()
 	update_wallet()
 	update_bars()
+	update_wardrobe()
 	update_portrait()
 	update_inbox()
 
@@ -389,6 +414,25 @@ func update_bars() -> void:
 	for key in STAT_KEYS:
 		if bars.has(key) and stats.has(key):
 			bars[key].value = float(stats[key])
+
+
+func update_wardrobe() -> void:
+	if state.is_empty():
+		return
+	var wardrobe: Array = state.get("wardrobe", [])
+	fill_option_list(wear_option, wardrobe)
+	var outfit = state.get("outfit", null)
+	var worn := "nothing in particular"
+	if outfit != null:
+		worn = str(outfit).replace("_", " ")
+	var decor: Array = state.get("decor", [])
+	var decor_text := "none"
+	if decor.size() > 0:
+		var names := []
+		for item in decor:
+			names.append(str(item).replace("_", " "))
+		decor_text = ", ".join(names)
+	outfit_label.text = "Wearing: %s · Decor: %s" % [worn, decor_text]
 
 
 func update_portrait() -> void:

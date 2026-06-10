@@ -59,6 +59,17 @@ def test_long_absence_produces_several_events():
     assert len(pet.inbox) >= 2
 
 
+def test_autonomous_buy_fills_wardrobe():
+    from myroomie.simulation import autonomous_buy
+    pet = make_pet()
+    pet.wallet.money = 100
+    bought = autonomous_buy(pet, random.Random(0))
+    assert bought is not None
+    assert bought in pet.wardrobe
+    assert pet.outfit == bought
+    assert pet.wallet.money < 100
+
+
 def test_neglect_eventually_harms_health():
     now = 1_000_000.0
     pet = make_pet(now=now)
