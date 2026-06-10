@@ -3,6 +3,9 @@
 // 2D point-and-click client. Served from the same origin as the API.
 const STAT_KEYS = ["hunger", "hygiene", "energy", "mood", "health", "loneliness", "affection"];
 const POLL_MS = 5000;
+const MG_DURATION = 12;
+const MG_GOAL = 8;
+let mgTimers = [];
 const t = (key) => window.I18n.t(key);
 
 let catalog = {};
@@ -77,6 +80,7 @@ function applyChrome() {
   el("gender").options[1].textContent = t("gender.boy");
   el("top-logout").textContent = t("btn.logout");
   el("panel-close").textContent = t("btn.close");
+  el("mg-cancel").textContent = t("mg.cancel");
   buildLangSwitch();
 }
 
@@ -230,7 +234,7 @@ function runAction(action) {
   if (action.kind === "act") { doAction(action.path); return; }
   if (action.kind === "hint") { toast(t(action.key)); return; }
   if (action.kind === "notes") { openNotes(); return; }
-  if (action.kind === "work") { openPicker("panel.work", "jobs", "/work", "job"); return; }
+  if (action.kind === "work") { openWorkPicker(); return; }
   if (action.kind === "panel") {
     if (action.source === "wardrobe") openWardrobe(action);
     else openPicker(action.title, action.category, action.path, action.field);
@@ -326,6 +330,59 @@ function closePanel() {
   el("panel-overlay").classList.add("hidden");
 }
 
+// --- Work mini-game ------------------------------------------------------
+function openWorkPicker() {
+  openPanelBuilder = () => {
+    const jobs = catalog.jobs || {};
+    const rows = Object.keys(jobs).map((key) => ({ key, sub: costLabel("jobs", jobs[key]) }));
+    renderPanel("panel.work", rows, (key) => { closePanel(); startMinigame(key); });
+  };
+  openPanelBuilder();
+}
+
+function stopMinigame() {
+  for (const handle of mgTimers) clearInterval(handle);
+  mgTimers = [];
+  el("mg-area").innerHTML = "";
+  el("minigame").classList.add("hidden");
+}
+
+function startMinigame(job) {
+  const spec = (catalog.jobs || {})[job] || [0, 0, 0, 0];
+  if (state.stats && state.stats.energy < spec[3]) { toast(t("mg.tootired")); return; }
+  let score = 0;
+  let time = MG_DURATION;
+  const area = el("mg-area");
+  area.innerHTML = "";
+  el("mg-title").textContent = t("mg.title");
+  el("minigame").classList.remove("hidden");
+  const status = () => { el("mg-status").textContent = `${t("mg.score")}: ${score}/${MG_GOAL}  ·  ${t("mg.time")}: ${time}s`; };
+  status();
+  const spawn = setInterval(() => {
+    const target = document.createElement("button");
+    target.className = "target";
+    target.style.left = (10 + Math.random() * 80) + "%";
+    target.style.top = (14 + Math.random() * 72) + "%";
+    target.onclick = () => { score += 1; status(); target.remove(); };
+    area.appendChild(target);
+    setTimeout(() => target.remove(), 900);
+  }, 650);
+  const tick = setInterval(() => {
+    time -= 1;
+    status();
+    if (time <= 0) finishMinigame(job, score >= MG_GOAL);
+  }, 1000);
+  mgTimers = [spawn, tick];
+}
+
+async function finishMinigame(job, won) {
+  stopMinigame();
+  if (!won) { toast(t("mg.lose")); return; }
+  const res = await api("/pets/" + petId() + "/work", "POST", { job });
+  if (res.ok) { state = res.data; updateAvatar(); renderHud(); toast(t("mg.win")); }
+  else toast(res.error);
+}
+
 // --- Polling -------------------------------------------------------------
 async function poll() {
   if (!petId()) return;
@@ -346,6 +403,7 @@ async function init() {
   el("top-logout").onclick = onLogout;
   el("panel-close").onclick = closePanel;
   el("panel-overlay").onclick = (e) => { if (e.target === el("panel-overlay")) closePanel(); };
+  el("mg-cancel").onclick = stopMinigame;
 
   const cat = await api("/catalog");
   if (cat.ok) catalog = cat.data;
