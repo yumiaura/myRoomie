@@ -81,6 +81,56 @@ def render(gender: str, mood: str) -> Image.Image:
     return image
 
 
+# Clothing overlays (transparent, layered over the portrait) and decor icons.
+OUTFITS = {
+    "cozy_sweater": (210, 120, 80),
+    "summer_dress": (255, 200, 220),
+    "denim_jacket": (80, 110, 170),
+    "pajamas": (180, 200, 230),
+}
+DECOR = {
+    "houseplant": (80, 160, 90),
+    "string_lights": (250, 220, 120),
+    "bookshelf": (150, 100, 60),
+    "rug": (200, 120, 140),
+}
+
+
+def render_outfit(item: str) -> Image.Image:
+    color = OUTFITS[item]
+    image = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(image)
+    if item == "summer_dress":
+        shoulders = [(98, 170), (158, 170), (196, 236), (60, 236)]   # flared
+    else:
+        shoulders = [(96, 170), (160, 170), (184, 236), (72, 236)]
+    draw.polygon(shoulders, fill=color)
+    draw.ellipse([114, 150, 142, 182], fill=SKIN)                    # neck gap
+    draw.line([(110, 176), (146, 176)], fill=(0, 0, 0, 60), width=3)  # collar hint
+    return image
+
+
+def render_decor(item: str) -> Image.Image:
+    color = DECOR[item]
+    image = Image.new("RGBA", (96, 96), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(image)
+    if item == "houseplant":
+        draw.polygon([(34, 60), (62, 60), (58, 86), (38, 86)], fill=(150, 100, 60))
+        draw.ellipse([30, 18, 66, 60], fill=color)
+    elif item == "bookshelf":
+        draw.rectangle([24, 18, 72, 86], fill=color)
+        for y in (38, 58, 78):
+            draw.line([(24, y), (72, y)], fill=(90, 60, 35), width=3)
+    elif item == "string_lights":
+        draw.line([(14, 30), (82, 30)], fill=(120, 120, 120), width=2)
+        for x in (24, 40, 56, 72):
+            draw.ellipse([x - 6, 32, x + 6, 44], fill=color)
+    else:  # rug
+        draw.ellipse([14, 40, 82, 78], fill=color)
+        draw.ellipse([28, 50, 68, 68], fill=(255, 255, 255, 120))
+    return image
+
+
 def main() -> None:
     os.makedirs(OUT_DIR, exist_ok=True)
     for gender in ("girl", "boy"):
@@ -88,6 +138,14 @@ def main() -> None:
             path = os.path.join(OUT_DIR, f"{gender}_{mood}.png")
             render(gender, mood).save(path)
             print("wrote", path)
+    for item in OUTFITS:
+        path = os.path.join(OUT_DIR, f"outfit_{item}.png")
+        render_outfit(item).save(path)
+        print("wrote", path)
+    for item in DECOR:
+        path = os.path.join(OUT_DIR, f"decor_{item}.png")
+        render_decor(item).save(path)
+        print("wrote", path)
 
 
 if __name__ == "__main__":

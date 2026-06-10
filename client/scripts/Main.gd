@@ -22,6 +22,8 @@ var preview_label: Label
 var preview_seed: int = 0
 
 var portrait: TextureRect
+var outfit_overlay: TextureRect
+var decor_box: HBoxContainer
 var current_mood: String = ""
 var header_label: Label
 var traits_label: Label
@@ -188,10 +190,18 @@ func build_room_screen() -> void:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 10)
 
+	var portrait_stack := Control.new()
+	portrait_stack.custom_minimum_size = Vector2(180, 180)
 	portrait = TextureRect.new()
-	portrait.custom_minimum_size = Vector2(180, 180)
+	portrait.set_anchors_preset(Control.PRESET_FULL_RECT)
 	portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	box.add_child(portrait)
+	portrait_stack.add_child(portrait)
+	outfit_overlay = TextureRect.new()
+	outfit_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	outfit_overlay.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	outfit_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	portrait_stack.add_child(outfit_overlay)
+	box.add_child(portrait_stack)
 
 	header_label = Label.new()
 	header_label.add_theme_font_size_override("font_size", 22)
@@ -228,6 +238,8 @@ func build_room_screen() -> void:
 	outfit_label = Label.new()
 	outfit_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(outfit_label)
+	decor_box = HBoxContainer.new()
+	box.add_child(decor_box)
 
 	box.add_child(HSeparator.new())
 
@@ -602,6 +614,24 @@ func update_wardrobe() -> void:
 			names.append(str(item).replace("_", " "))
 		decor_text = ", ".join(names)
 	outfit_label.text = "Wearing: %s · Decor: %s" % [worn, decor_text]
+
+	# Layer the worn outfit over the portrait.
+	if outfit != null and ResourceLoader.exists("res://assets/portraits/outfit_%s.png" % str(outfit)):
+		outfit_overlay.texture = load("res://assets/portraits/outfit_%s.png" % str(outfit))
+	else:
+		outfit_overlay.texture = null
+
+	# Show placed decor as little icons.
+	for child in decor_box.get_children():
+		child.queue_free()
+	for item in decor:
+		var decor_path := "res://assets/portraits/decor_%s.png" % str(item)
+		if ResourceLoader.exists(decor_path):
+			var icon := TextureRect.new()
+			icon.texture = load(decor_path)
+			icon.custom_minimum_size = Vector2(48, 48)
+			icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			decor_box.add_child(icon)
 
 
 func update_portrait() -> void:
