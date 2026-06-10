@@ -270,7 +270,14 @@ func build_room_screen() -> void:
 	box.add_child(diary_box)
 
 	box.add_child(HSeparator.new())
-	box.add_child(make_simple_action("Switch roomie", on_move_out))
+	var session_row := HBoxContainer.new()
+	var switch_button := make_simple_action("Switch roomie", on_move_out)
+	switch_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	session_row.add_child(switch_button)
+	var logout_button := make_simple_action("Log out", on_logout)
+	logout_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	session_row.add_child(logout_button)
+	box.add_child(session_row)
 
 	room_root = wrap_in_scroll(box)
 	add_child(room_root)
