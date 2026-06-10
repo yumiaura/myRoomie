@@ -1,11 +1,12 @@
 """FastAPI application: the roomie lives here and the Godot client talks to it."""
 from __future__ import annotations
 
+import asyncio
 import random
 import time
 import uuid
 
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
 from . import __version__, auth, config, economy
@@ -202,6 +203,32 @@ def create_app(db_path: str = "myroomie.db") -> FastAPI:
             event.seen = True
         store.save(state)
         return state
+
+    @app.websocket("/pets/{pet_id}/ws")
+    async def pet_stream(websocket: WebSocket, pet_id: str, token: str = "") -> None:
+        """Live state stream. Auth rides in the query string (`?token=`)
+        because WebSocket clients can't easily set headers. Pushes a fresh,
+        time-advanced snapshot every WS_PUSH_SECONDS until the client leaves."""
+        username = store.user_for_token(token) if token else None
+        if username is None:
+            await websocket.close(code=4401)
+            return
+        owner_state = store.get(pet_id)
+        if owner_state is None or owner_state.owner != username:
+            await websocket.close(code=4404)
+            return
+        await websocket.accept()
+        try:
+            while True:
+                live = store.get(pet_id)
+                if live is None:
+                    break
+                advance(live, time.time())
+                store.save(live)
+                await websocket.send_text(live.model_dump_json())
+                await asyncio.sleep(config.WS_PUSH_SECONDS)
+        except WebSocketDisconnect:
+            return
 
     return app
 
