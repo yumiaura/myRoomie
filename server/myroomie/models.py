@@ -72,6 +72,10 @@ class CreatePetRequest(BaseModel):
     seed: Optional[int] = None
 
 
+class PreviewRequest(BaseModel):
+    seed: Optional[int] = None
+
+
 class FeedRequest(BaseModel):
     food: str
 

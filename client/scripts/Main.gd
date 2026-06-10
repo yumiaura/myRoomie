@@ -12,6 +12,8 @@ var creation_root: Control
 var room_root: Control
 var name_edit: LineEdit
 var gender_option: OptionButton
+var preview_label: Label
+var preview_seed: int = 0
 
 var portrait: TextureRect
 var header_label: Label
@@ -45,6 +47,7 @@ func _ready() -> void:
 	if loaded["ok"]:
 		catalog = loaded["data"]
 		populate_catalogs()
+	do_reroll()
 
 
 # --- Screen construction --------------------------------------------------
@@ -85,6 +88,16 @@ func build_creation_screen() -> void:
 	gender_option.add_item("girl")
 	gender_option.add_item("boy")
 	box.add_child(gender_option)
+
+	var reroll := Button.new()
+	reroll.text = "🎲 Reroll personality"
+	reroll.pressed.connect(do_reroll)
+	box.add_child(reroll)
+
+	preview_label = Label.new()
+	preview_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	preview_label.text = "Rolling a personality…"
+	box.add_child(preview_label)
 
 	var move_in := Button.new()
 	move_in.text = "Move in"
@@ -208,13 +221,31 @@ func selected(option: OptionButton) -> String:
 
 
 # --- Flow -----------------------------------------------------------------
+func do_reroll() -> void:
+	var result = await Api.post_json("/preview", {})
+	if not result["ok"]:
+		preview_label.text = "(start the server to roll a personality)"
+		return
+	preview_seed = int(result["data"]["seed"])
+	var traits: Dictionary = result["data"]["traits"]
+	preview_label.text = "%s · loves %s · into %s · favourite food: %s" % [
+		traits["personality"],
+		str(traits["love_language"]).replace("_", " "),
+		traits["hobby"],
+		str(traits["favorite_food"]).replace("_", " "),
+	]
+
+
 func on_move_in() -> void:
 	var chosen_name := name_edit.text.strip_edges()
 	if chosen_name == "":
 		status_label.text = "Give them a name first."
 		return
 	var gender := gender_option.get_item_text(gender_option.selected)
-	var result = await Api.post_json("/pets", {"name": chosen_name, "gender": gender})
+	var payload := {"name": chosen_name, "gender": gender}
+	if preview_seed != 0:
+		payload["seed"] = preview_seed
+	var result = await Api.post_json("/pets", payload)
 	if not result["ok"]:
 		status_label.text = str(result["error"])
 		return
