@@ -42,6 +42,9 @@ def add_affection(state: PetState, amount: float, now: float) -> None:
             f"Something shifted between you two. You're {state.relationship.replace('_', ' ')} now. 💞",
         )
         push_diary(state, now, "milestone", f"Became {state.relationship.replace('_', ' ')}.")
+        for line in config.NARRATIVE_BEATS.get(state.relationship, []):
+            push_event(state, now, "story", line)
+        push_diary(state, now, "story", f"A new chapter: {state.relationship.replace('_', ' ')}.")
     state.stats.affection = clamp(state.stats.affection)
 
 
