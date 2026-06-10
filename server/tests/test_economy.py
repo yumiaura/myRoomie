@@ -72,6 +72,16 @@ def test_play_builds_affection_and_relationship():
     assert pet.relationship == "getting_to_know"
 
 
+def test_promotion_delivers_story_beats():
+    pet = make_pet()
+    pet.stats.energy = 100.0
+    pet.stats.affection = 98.0
+    economy.play(pet, "movie_night", NOW)
+    assert pet.relationship == "getting_to_know"
+    assert any(entry.kind == "story" for entry in pet.inbox)
+    assert any(entry.kind == "story" for entry in pet.diary)
+
+
 def test_gift_grants_affection():
     pet = make_pet()
     affection_before = pet.stats.affection

@@ -142,6 +142,34 @@ RELATIONSHIP_STAGES = [
     "inseparable",
 ]
 
+# Mini-narrative: each newly reached stage delivers a couple of warm, slightly
+# literary story beats so the bond reads like an unfolding tale. The initial
+# stage ("new_acquaintance") has none — the story only begins once it deepens.
+NARRATIVE_BEATS = {
+    "getting_to_know": [
+        "You learn how they take their coffee, and they learn you never quite finish yours.",
+        "The quiet between you turns from polite to comfortable, like a room slowly warming.",
+    ],
+    "friends": [
+        "There is a mug that is yours now, and a side of the couch, and an inside joke nobody else would get.",
+        "They start saving the small stories of their day to tell you when you get home.",
+        "You realise you've stopped knocking before stepping into each other's evenings.",
+    ],
+    "close": [
+        "On the hard days they don't ask if you're alright — they just sit closer.",
+        "Your silences have become a language of their own, fluent and unhurried.",
+    ],
+    "sweethearts": [
+        "Somewhere between the morning tea and the late films, the word 'home' started meaning them.",
+        "They reach for your hand the way one reaches for a light switch in a familiar dark.",
+        "Every small ordinary hour feels quietly, absurdly lucky.",
+    ],
+    "inseparable": [
+        "Two lives have braided into one, and neither of you can find the seam.",
+        "Whatever the day brings, you face it shoulder to shoulder, and that is simply how it is now.",
+    ],
+}
+
 
 def xp_to_next(level: int) -> int:
     """Experience needed to advance from the given level to the next one."""
