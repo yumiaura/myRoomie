@@ -16,6 +16,7 @@ var preview_label: Label
 var preview_seed: int = 0
 
 var portrait: TextureRect
+var current_mood: String = ""
 var header_label: Label
 var traits_label: Label
 var wallet_label: Label
@@ -258,6 +259,7 @@ func on_move_in() -> void:
 		status_label.text = str(result["error"])
 		return
 	Api.pet_id = result["data"]["id"]
+	current_mood = ""
 	apply_state(result["data"])
 	var visited = await Api.post_json("/pets/%s/visit" % Api.pet_id)
 	if visited["ok"]:
@@ -350,9 +352,25 @@ func update_portrait() -> void:
 		mood = "sad"
 	elif float(stats["mood"]) > 70.0:
 		mood = "happy"
+	if mood == current_mood:
+		return
+	current_mood = mood
 	var path := "res://assets/portraits/%s_%s.png" % [state["gender"], mood]
 	if ResourceLoader.exists(path):
 		portrait.texture = load(path)
+		animate_portrait()
+
+
+func animate_portrait() -> void:
+	# A small fade-and-pop whenever the mood (and therefore the picture) changes.
+	portrait.pivot_offset = portrait.custom_minimum_size / 2.0
+	portrait.modulate.a = 0.0
+	portrait.scale = Vector2(0.85, 0.85)
+	var tween := create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(portrait, "modulate:a", 1.0, 0.25)
+	tween.tween_property(portrait, "scale", Vector2.ONE, 0.3) \
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
 func update_inbox() -> void:
