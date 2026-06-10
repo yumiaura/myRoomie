@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "myRoomie"
+version = "0.1.0"
+description = "Server for a virtual roomie who keeps living, and quietly grows attached, between your visits."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Olya Yumi" }]
+keywords = ["virtual-pet", "life-simulation", "companion", "fastapi", "godot", "game"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Framework :: FastAPI",
+    "License :: OSI Approved :: MIT License",
+    "Topic :: Games/Entertainment :: Simulation",
+]
+dependencies = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.27",
+    "pydantic>=2.6",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "httpx>=0.27"]
+
+[project.scripts]
+myroomie = "myroomie.__main__:main"
+
+[project.urls]
+Homepage = "https://github.com/yumiaura/myRoomie"
+Repository = "https://github.com/yumiaura/myRoomie"
+
+[tool.setuptools.packages.find]
+where = ["server"]
+include = ["myroomie*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["server"]
+testpaths = ["server/tests"]
