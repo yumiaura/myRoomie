@@ -278,9 +278,12 @@ def create_app(db_path: str = "myroomie.db") -> FastAPI:
     # last so every API/WS route above takes precedence; "/" serves the SPA.
     base = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     assets_dir = os.path.join(base, "client", "assets", "portraits")
+    scenes_dir = os.path.join(base, "client", "assets", "scenes")
     web_dir = os.path.join(base, "web")
     if os.path.isdir(assets_dir):
         app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+    if os.path.isdir(scenes_dir):
+        app.mount("/scenes", StaticFiles(directory=scenes_dir), name="scenes")
     if os.path.isdir(web_dir):
         app.mount("/", StaticFiles(directory=web_dir, html=True), name="web")
 
