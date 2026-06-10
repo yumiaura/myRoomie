@@ -1,0 +1,175 @@
+{
+  "canvas": {
+    "width": 960,
+    "height": 640
+  },
+  "coordinates": "percent",
+  "scenes": {
+    "apartment": {
+      "bg": "scene_apartment.png",
+      "hotspots": [
+        {
+          "id": "bed",
+          "x": 4,
+          "y": 22,
+          "w": 26,
+          "h": 30
+        },
+        {
+          "id": "kitchen",
+          "x": 33,
+          "y": 15,
+          "w": 24,
+          "h": 25
+        },
+        {
+          "id": "wardrobe",
+          "x": 61,
+          "y": 24,
+          "w": 14,
+          "h": 46
+        },
+        {
+          "id": "shower",
+          "x": 80,
+          "y": 24,
+          "w": 16,
+          "h": 50
+        },
+        {
+          "id": "roomie",
+          "x": 40,
+          "y": 36,
+          "w": 20,
+          "h": 42
+        },
+        {
+          "id": "mailbox",
+          "x": 21,
+          "y": 60,
+          "w": 9,
+          "h": 18
+        },
+        {
+          "id": "notebook",
+          "x": 40,
+          "y": 64,
+          "w": 11,
+          "h": 13
+        },
+        {
+          "id": "broom",
+          "x": 52,
+          "y": 70,
+          "w": 10,
+          "h": 18
+        },
+        {
+          "id": "door",
+          "x": 4,
+          "y": 56,
+          "w": 15,
+          "h": 40
+        }
+      ]
+    },
+    "street": {
+      "bg": "scene_street.png",
+      "hotspots": [
+        {
+          "id": "grocery",
+          "x": 5,
+          "y": 28,
+          "w": 26,
+          "h": 48
+        },
+        {
+          "id": "mall",
+          "x": 37,
+          "y": 22,
+          "w": 26,
+          "h": 54
+        },
+        {
+          "id": "work",
+          "x": 69,
+          "y": 18,
+          "w": 26,
+          "h": 60
+        },
+        {
+          "id": "home",
+          "x": 3,
+          "y": 72,
+          "w": 15,
+          "h": 26
+        }
+      ]
+    },
+    "grocery": {
+      "bg": "scene_grocery.png",
+      "hotspots": [
+        {
+          "id": "shelf",
+          "x": 14,
+          "y": 24,
+          "w": 72,
+          "h": 54
+        },
+        {
+          "id": "back",
+          "x": 2,
+          "y": 4,
+          "w": 13,
+          "h": 13
+        }
+      ]
+    },
+    "mall": {
+      "bg": "scene_mall.png",
+      "hotspots": [
+        {
+          "id": "gifts",
+          "x": 9,
+          "y": 26,
+          "w": 37,
+          "h": 52
+        },
+        {
+          "id": "clothes",
+          "x": 54,
+          "y": 26,
+          "w": 37,
+          "h": 52
+        },
+        {
+          "id": "back",
+          "x": 2,
+          "y": 4,
+          "w": 13,
+          "h": 13
+        }
+      ]
+    },
+    "work": {
+      "bg": "scene_work.png",
+      "hotspots": [
+        {
+          "id": "desk",
+          "x": 20,
+          "y": 30,
+          "w": 60,
+          "h": 46
+        },
+        {
+          "id": "back",
+          "x": 2,
+          "y": 4,
+          "w": 13,
+          "h": 13
+        }
+      ]
+    }
+  },
+  "guidelines": "Each hotspot is a clickable region in percent of the canvas. Real art must keep the same canvas aspect and place interactive objects within these regions (or update both this manifest and web/scenes.js together). Backgrounds are opaque PNGs named scene_<name>.png; the roomie avatar in the apartment is drawn by the client over the 'roomie' region using the portrait art under /assets/portraits."
+}

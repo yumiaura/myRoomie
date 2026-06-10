@@ -130,6 +130,13 @@ def test_catalog_includes_shop(client):
     assert "shop" in catalog and "cozy_sweater" in catalog["shop"]
 
 
+def test_scenes_are_served(client):
+    manifest = client.get("/scenes/manifest.json")
+    assert manifest.status_code == 200
+    assert "apartment" in manifest.json()["scenes"]
+    assert client.get("/scenes/scene_apartment.png").status_code == 200
+
+
 def test_buy_and_wear_endpoints(client):
     pet = create_roomie(client)
     pid = pet["id"]
