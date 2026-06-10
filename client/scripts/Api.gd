@@ -2,9 +2,17 @@ extends Node
 ## Thin async wrapper around the myRoomie HTTP server.
 ## Registered as an autoload singleton named "Api".
 
-var base_url := "http://127.0.0.1:8000"
+var base_url := "http://127.0.0.1:8800"
 var pet_id := ""
 var token := ""
+
+
+func _ready() -> void:
+	# Honour a server address passed by main.py: godot ... -- --server <url>
+	var user_args := OS.get_cmdline_user_args()
+	for i in range(user_args.size() - 1):
+		if user_args[i] == "--server":
+			base_url = user_args[i + 1]
 
 
 ## Perform a request and return {ok, data} or {ok=false, error}.
